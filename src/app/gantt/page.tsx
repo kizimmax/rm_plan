@@ -636,7 +636,7 @@ export default function GanttPage() {
           {weeks.map(w => (
             <div key={w.id} className="border border-border rounded-xl p-3 md:p-4 relative overflow-hidden flex-shrink-0 w-[200px] md:w-auto">
               <div className="absolute top-0 left-0 right-0 h-0.5" style={{ backgroundColor: w.color }} />
-              <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground mb-1">
+              <div className="font-mono text-[12px] uppercase tracking-[0.12em] text-muted-foreground mb-1">
                 <EditableText value={w.dates} onChange={v => updateWeekDates(w.id, v)} />
               </div>
               <div className="font-heading font-bold text-sm md:text-base mb-1">
@@ -672,7 +672,7 @@ export default function GanttPage() {
                     <div className="font-mono text-xs font-bold uppercase tracking-wide" style={{ color: textColor(w.color) }}>
                       <EditableText value={w.label} onChange={v => updateWeekLabel(w.id, v)} />
                     </div>
-                    <div className="font-mono text-[10px] text-muted-foreground mt-0.5">
+                    <div className="font-mono text-[12px] text-muted-foreground mt-0.5">
                       <EditableText value={w.dates} onChange={v => updateWeekDates(w.id, v)} />
                     </div>
                   </div>
@@ -717,7 +717,7 @@ export default function GanttPage() {
                         {!locked && (
                           <button
                             onClick={() => addCard(row.id, w.id)}
-                            className="w-full mb-1.5 flex items-center justify-center gap-1 rounded text-[10px] font-mono uppercase tracking-wide transition-colors"
+                            className="w-full mb-1.5 flex items-center justify-center gap-1 rounded text-[12px] font-mono uppercase tracking-wide transition-colors"
                             style={{ height: 18, color: textColor(w.color), opacity: 0.35, backgroundColor: w.color + '10', border: `1px dashed ${w.color}40` }}
                             onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '0.8'; }}
                             onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '0.35'; }}
@@ -769,7 +769,7 @@ export default function GanttPage() {
                 <span className="font-mono text-xs font-bold uppercase tracking-wide flex-1" style={{ color: w.color }}>
                   {w.label}
                 </span>
-                <span className="font-mono text-[10px] text-muted-foreground">{w.dates}</span>
+                <span className="font-mono text-[12px] text-muted-foreground">{w.dates}</span>
               </div>
               {/* Строки */}
               <div className="divide-y divide-border/40">
@@ -784,7 +784,7 @@ export default function GanttPage() {
                         {!locked && (
                           <button
                             onClick={() => addCard(row.id, w.id)}
-                            className="text-[10px] font-mono px-2 py-0.5 rounded transition-colors"
+                            className="text-[12px] font-mono px-2 py-0.5 rounded transition-colors"
                             style={{ color: textColor(w.color), backgroundColor: w.color + '18', border: `1px dashed ${w.color}40` }}
                           >+ задача</button>
                         )}
@@ -807,7 +807,7 @@ export default function GanttPage() {
                         </div>
                       )}
                       {cards.length === 0 && !locked && (
-                        <div className="text-[10px] text-muted-foreground/40 font-mono py-1">пусто</div>
+                        <div className="text-[12px] text-muted-foreground/40 font-mono py-1">пусто</div>
                       )}
                     </div>
                   );
