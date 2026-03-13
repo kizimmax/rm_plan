@@ -412,20 +412,34 @@ function loadState() {
 }
 
 export default function GanttPage() {
-  const saved = loadState();
-  const [weeks, setWeeks] = useState<Week[]>(saved?.weeks ?? INITIAL_WEEKS);
-  const [rows, setRows] = useState<Row[]>(saved?.rows ?? INITIAL_ROWS);
-  const [title, setTitle] = useState(saved?.title ?? 'План работ 9 марта — 3 апреля');
-  const [subtitle, setSubtitle] = useState(saved?.subtitle ?? '4 недели · Дизайн-система + MVP сервиса + Продуктовые страницы');
-  const [locked, setLocked] = useState(saved?.locked ?? false);
+  const [hydrated, setHydrated] = useState(false);
+  const [weeks, setWeeks] = useState<Week[]>(INITIAL_WEEKS);
+  const [rows, setRows] = useState<Row[]>(INITIAL_ROWS);
+  const [title, setTitle] = useState('План работ 9 марта — 3 апреля');
+  const [subtitle, setSubtitle] = useState('4 недели · Дизайн-система + MVP сервиса + Продуктовые страницы');
+  const [locked, setLocked] = useState(false);
   const [showLockModal, setShowLockModal] = useState(false);
 
-  // Persist state to localStorage on every change
+  // Load from localStorage after mount (client only)
   useEffect(() => {
+    const saved = loadState();
+    if (saved) {
+      if (saved.weeks) setWeeks(saved.weeks);
+      if (saved.rows) setRows(saved.rows);
+      if (saved.title) setTitle(saved.title);
+      if (saved.subtitle) setSubtitle(saved.subtitle);
+      if (saved.locked !== undefined) setLocked(saved.locked);
+    }
+    setHydrated(true);
+  }, []);
+
+  // Persist state to localStorage on every change (only after hydration)
+  useEffect(() => {
+    if (!hydrated) return;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ weeks, rows, title, subtitle, locked }));
-    } catch { /* quota exceeded or SSR */ }
-  }, [weeks, rows, title, subtitle, locked]);
+    } catch { /* quota exceeded */ }
+  }, [weeks, rows, title, subtitle, locked, hydrated]);
 
   // ── Row drag ──────────────────────────────────────────────────────────────
   const dragRowIdx = useRef<number | null>(null);
