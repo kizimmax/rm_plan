@@ -415,6 +415,30 @@ function SyncDot({ status }: { status: 'synced' | 'saving' | 'error' | 'loading'
 
 const DB_PATH = 'gantt';
 
+// ─── Migrate legacy hex colors → ColorToken names ─────────────────────────────
+const HEX_TO_TOKEN: Record<string, ColorToken> = {
+  '#a172f8': 'violet', '#56caea': 'sky', '#fe733a': 'terracotta', '#ffcc00': 'yellow',
+  '#c4a0fb': 'violet', '#8adcf2': 'sky', '#ffa07a': 'terracotta', '#ffe066': 'yellow',
+  '#f472b6': 'pink',   '#3b82f6': 'blue', '#ef4444': 'red',       '#22c55e': 'green',
+};
+const VALID_TOKENS = new Set<ColorToken>(['yellow','violet','sky','terracotta','pink','blue','red','green']);
+
+function migrateColor(c: unknown): ColorToken {
+  if (typeof c === 'string') {
+    const lower = c.toLowerCase();
+    if (VALID_TOKENS.has(lower as ColorToken)) return lower as ColorToken;
+    if (HEX_TO_TOKEN[lower]) return HEX_TO_TOKEN[lower];
+  }
+  return 'violet';
+}
+
+function migrateWeeks(raw: unknown[]): Week[] {
+  return raw.map((w: unknown) => {
+    const week = w as Week;
+    return { ...week, color: migrateColor(week.color) };
+  });
+}
+
 export default function GanttPage() {
   const [weeks, setWeeks] = useState<Week[]>(INITIAL_WEEKS);
   const [rows, setRows] = useState<Row[]>(INITIAL_ROWS);
@@ -438,7 +462,7 @@ export default function GanttPage() {
         const data = snapshot.val();
         remoteUpdate.current = true;
         if (data) {
-          if (data.weeks) setWeeks(data.weeks);
+          if (data.weeks) setWeeks(migrateWeeks(data.weeks));
           if (data.rows) setRows(data.rows);
           if (data.title) setTitle(data.title);
           if (data.subtitle) setSubtitle(data.subtitle);
