@@ -121,7 +121,7 @@ const INITIAL_ROWS: Row[] = [
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function textColor(hex: string) {
-  return hex === '#FFCC00' ? '#7A6200' : hex;
+  return hex;
 }
 
 // ─── EditableText ─────────────────────────────────────────────────────────────
@@ -242,7 +242,7 @@ function CardItem({
         >
           {c.done && (
             <svg viewBox="0 0 10 10" className="w-full h-full" fill="none">
-              <path d="M2 5l2.5 2.5L8 3" stroke={weekColor === '#FFCC00' ? '#7A6200' : '#fff'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M2 5l2.5 2.5L8 3" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           )}
         </button>
@@ -262,7 +262,7 @@ function CardItem({
                   height: 16,
                   borderRadius: 3,
                   backgroundColor: active ? weekColor : weekColor + '18',
-                  color: active ? (weekColor === '#FFCC00' ? '#7A6200' : '#fff') : textColor(weekColor),
+                  color: active ? '#fff' : textColor(weekColor),
                   opacity: active ? 1 : 0.5,
                   border: `1px solid ${active ? weekColor : weekColor + '40'}`,
                 }}
@@ -317,7 +317,7 @@ function CardItem({
           {(lines.length > 0 ? lines : [c.label]).map((line, i) => (
             <li key={i} className="flex items-start gap-1.5 text-xs leading-snug">
               <span className="flex-shrink-0 mt-[3px] w-1 h-1 rounded-full" style={{ backgroundColor: weekColor, opacity: 0.7 }} />
-              <span style={{ color: tc, textDecoration: c.done ? 'line-through' : 'none' }}>
+              <span style={{ color: tc }}>
                 {line}
               </span>
             </li>
