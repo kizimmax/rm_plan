@@ -262,7 +262,7 @@ function CardItem({
                   height: 16,
                   borderRadius: 3,
                   backgroundColor: active ? weekColor : weekColor + '18',
-                  color: active ? '#fff' : textColor(weekColor),
+                  color: active ? (weekColor === '#FFCC00' ? '#121212' : '#fff') : textColor(weekColor),
                   opacity: active ? 1 : 0.5,
                   border: `1px solid ${active ? weekColor : weekColor + '40'}`,
                 }}
@@ -406,7 +406,7 @@ function loadState() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     return JSON.parse(raw) as {
-      weeks: Week[]; rows: Row[]; title: string; subtitle: string;
+      weeks: Week[]; rows: Row[]; title: string; subtitle: string; locked?: boolean;
     };
   } catch { return null; }
 }
@@ -417,15 +417,15 @@ export default function GanttPage() {
   const [rows, setRows] = useState<Row[]>(saved?.rows ?? INITIAL_ROWS);
   const [title, setTitle] = useState(saved?.title ?? 'План работ 9 марта — 3 апреля');
   const [subtitle, setSubtitle] = useState(saved?.subtitle ?? '4 недели · Дизайн-система + MVP сервиса + Продуктовые страницы');
-  const [locked, setLocked] = useState(false);
+  const [locked, setLocked] = useState(saved?.locked ?? false);
   const [showLockModal, setShowLockModal] = useState(false);
 
   // Persist state to localStorage on every change
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ weeks, rows, title, subtitle }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ weeks, rows, title, subtitle, locked }));
     } catch { /* quota exceeded or SSR */ }
-  }, [weeks, rows, title, subtitle]);
+  }, [weeks, rows, title, subtitle, locked]);
 
   // ── Row drag ──────────────────────────────────────────────────────────────
   const dragRowIdx = useRef<number | null>(null);

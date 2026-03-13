@@ -1,12 +1,10 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { ThemeProvider } from "@/components/theme-provider";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { Toaster } from "@/components/ui/sonner";
+import { ThemeProvider, TooltipProvider, Toaster } from "@rocketmind/ui";
 
 export const metadata: Metadata = {
-  title: "Rocketmind Design System",
-  description: "Design system documentation for Rocketmind SaaS platform",
+  title: "План работ — Rocketmind",
+  description: "Диаграмма Ганта плана работ по проекту Rocketmind MVP 1.1",
 };
 
 export default function RootLayout({
@@ -19,7 +17,7 @@ export default function RootLayout({
       <body className="antialiased">
         <ThemeProvider
           attribute="class"
-          defaultTheme="light"
+          defaultTheme="dark"
           enableSystem={false}
           disableTransitionOnChange
         >
