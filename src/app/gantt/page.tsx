@@ -614,12 +614,12 @@ export default function GanttPage() {
     <div className="min-h-screen bg-background text-foreground font-body">
 
       {/* Header */}
-      <div className="border-b border-border px-8 py-6">
+      <div className="border-b border-border px-4 md:px-8 py-4 md:py-6">
         <div className="max-w-[1400px] mx-auto">
           <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground mb-1">
             Rocketmind · MVP 1.1
           </p>
-          <h1 className="font-heading text-[2rem] font-bold leading-tight">
+          <h1 className="font-heading text-2xl md:text-[2rem] font-bold leading-tight">
             <EditableText value={title} onChange={setTitle} />
           </h1>
           <p className="text-muted-foreground mt-1.5 text-sm">
@@ -628,17 +628,18 @@ export default function GanttPage() {
         </div>
       </div>
 
-      <div className="max-w-[1400px] mx-auto px-8 py-8 space-y-6">
+      <div className="max-w-[1400px] mx-auto px-3 md:px-8 py-4 md:py-8 space-y-4 md:space-y-6">
 
-        {/* Week cards */}
-        <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${weeks.length}, 1fr)` }}>
+        {/* Week cards — горизонтальный скролл на мобильном */}
+        <div className="flex gap-3 overflow-x-auto pb-1 md:grid md:overflow-visible md:pb-0"
+          style={{ gridTemplateColumns: `repeat(${weeks.length}, 1fr)` } as React.CSSProperties}>
           {weeks.map(w => (
-            <div key={w.id} className="border border-border rounded-xl p-4 relative overflow-hidden">
+            <div key={w.id} className="border border-border rounded-xl p-3 md:p-4 relative overflow-hidden flex-shrink-0 w-[200px] md:w-auto">
               <div className="absolute top-0 left-0 right-0 h-0.5" style={{ backgroundColor: w.color }} />
               <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground mb-1">
                 <EditableText value={w.dates} onChange={v => updateWeekDates(w.id, v)} />
               </div>
-              <div className="font-heading font-bold text-base mb-1">
+              <div className="font-heading font-bold text-sm md:text-base mb-1">
                 <EditableText value={w.label} onChange={v => updateWeekLabel(w.id, v)} />
               </div>
               <p className="text-xs text-muted-foreground leading-snug">
@@ -648,11 +649,12 @@ export default function GanttPage() {
           ))}
         </div>
 
-        {/* Gantt table */}
-        <div className="border border-border rounded-xl overflow-hidden">
+        {/* Gantt table — desktop: горизонтальная таблица, mobile: недели вертикально */}
+
+        {/* DESKTOP таблица */}
+        <div className="hidden md:block border border-border rounded-xl overflow-hidden">
           <div className="overflow-x-auto">
             <div style={{ minWidth: COL_W + weeks.length * 240 }}>
-
               {/* Header */}
               <div className="flex border-b border-border bg-muted/40 sticky top-0 z-10">
                 <div
@@ -676,7 +678,6 @@ export default function GanttPage() {
                   </div>
                 ))}
               </div>
-
               {/* Rows */}
               {rows.map((row, idx) => (
                 <div
@@ -693,30 +694,16 @@ export default function GanttPage() {
                   onDrop={e => onRowDrop(e, idx)}
                   onDragEnd={onRowDragEnd}
                 >
-                  {/* Left column */}
                   <div
                     className="flex-shrink-0 flex items-start gap-2 px-3 py-3 border-r border-border bg-background"
                     style={{ width: COL_W, minWidth: COL_W }}
                   >
-                    <span
-                      className="cursor-grab text-muted-foreground/30 hover:text-muted-foreground transition-colors select-none flex-shrink-0 mt-0.5 text-base leading-none"
-                      title="Перетащить строку"
-                    >
-                      ⠿
-                    </span>
+                    <span className="cursor-grab text-muted-foreground/30 hover:text-muted-foreground transition-colors select-none flex-shrink-0 mt-0.5 text-base leading-none" title="Перетащить строку">⠿</span>
                     <span className="text-xs font-medium text-foreground flex-1 min-w-0 mt-0.5">
                       <EditableText value={row.label} onChange={v => updateRowLabel(row.id, v)} />
                     </span>
-                    <button
-                      onClick={() => removeRow(row.id)}
-                      className="flex-shrink-0 text-muted-foreground/20 hover:text-destructive transition-colors text-sm leading-none mt-0.5"
-                      title="Удалить строку"
-                    >
-                      ×
-                    </button>
+                    <button onClick={() => removeRow(row.id)} className="flex-shrink-0 text-muted-foreground/20 hover:text-destructive transition-colors text-sm leading-none mt-0.5" title="Удалить строку">×</button>
                   </div>
-
-                  {/* Week cells */}
                   {weeks.map(w => {
                     const cards = row.cells[w.id] ?? [];
                     return (
@@ -727,45 +714,23 @@ export default function GanttPage() {
                         onDragOver={e => onCardDragOver(e, row.id, w.id, null)}
                         onDrop={e => onCardDrop(e, row.id, w.id, null)}
                       >
-                        {/* + add card button — thin, top of cell */}
                         {!locked && (
                           <button
                             onClick={() => addCard(row.id, w.id)}
                             className="w-full mb-1.5 flex items-center justify-center gap-1 rounded text-[10px] font-mono uppercase tracking-wide transition-colors"
-                            style={{
-                              height: 18,
-                              color: textColor(w.color),
-                              opacity: 0.35,
-                              backgroundColor: w.color + '10',
-                              border: `1px dashed ${w.color}40`,
-                            }}
+                            style={{ height: 18, color: textColor(w.color), opacity: 0.35, backgroundColor: w.color + '10', border: `1px dashed ${w.color}40` }}
                             onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '0.8'; }}
                             onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '0.35'; }}
-                            title="Добавить задачу"
-                          >
-                            + задача
-                          </button>
+                          >+ задача</button>
                         )}
-
-                        {/* Cards */}
                         <div className="flex flex-col gap-0">
                           {cards.map(c => {
-                            const isDropBefore =
-                              cardDropTarget?.rowId === row.id &&
-                              cardDropTarget?.weekId === w.id &&
-                              cardDropTarget?.cardId === c.id &&
-                              dragCard.current?.cardId !== c.id;
+                            const isDropBefore = cardDropTarget?.rowId === row.id && cardDropTarget?.weekId === w.id && cardDropTarget?.cardId === c.id && dragCard.current?.cardId !== c.id;
                             return (
                               <div key={c.id}>
-                                {/* drop indicator line */}
-                                {isDropBefore && (
-                                  <div className="h-0.5 mx-1 rounded-full mb-1" style={{ backgroundColor: w.color }} />
-                                )}
+                                {isDropBefore && <div className="h-0.5 mx-1 rounded-full mb-1" style={{ backgroundColor: w.color }} />}
                                 <div className="mb-1.5">
-                                  <CardItem
-                                    card={c}
-                                    weekColor={w.color}
-                                    locked={locked}
+                                  <CardItem card={c} weekColor={w.color} locked={locked}
                                     onToggleDone={() => toggleCardDone(row.id, w.id, c.id)}
                                     onUpdateLabel={v => updateCardLabel(row.id, w.id, c.id, v)}
                                     onRemove={() => removeCard(row.id, w.id, c.id)}
@@ -780,16 +745,10 @@ export default function GanttPage() {
                               </div>
                             );
                           })}
-                          {/* drop indicator at end */}
-                          {cardDropTarget?.rowId === row.id &&
-                            cardDropTarget?.weekId === w.id &&
-                            cardDropTarget?.cardId === null &&
-                            dragCard.current && (
+                          {cardDropTarget?.rowId === row.id && cardDropTarget?.weekId === w.id && cardDropTarget?.cardId === null && dragCard.current && (
                             <div className="h-0.5 mx-1 rounded-full mb-1" style={{ backgroundColor: w.color }} />
                           )}
-                          {cards.length === 0 && (
-                            <div className="min-h-[40px] rounded-md border border-dashed border-border/0 hover:border-border/40 transition-colors" />
-                          )}
+                          {cards.length === 0 && <div className="min-h-[40px] rounded-md border border-dashed border-border/0 hover:border-border/40 transition-colors" />}
                         </div>
                       </div>
                     );
@@ -800,8 +759,66 @@ export default function GanttPage() {
           </div>
         </div>
 
+        {/* MOBILE вид — недели вертикально, каждая неделя раскрывается */}
+        <div className="md:hidden space-y-3">
+          {weeks.map(w => (
+            <div key={w.id} className="border border-border rounded-xl overflow-hidden">
+              {/* Заголовок недели */}
+              <div className="px-3 py-2.5 flex items-center gap-2" style={{ borderBottom: `1px solid ${w.color}30`, backgroundColor: w.color + '0D' }}>
+                <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: w.color }} />
+                <span className="font-mono text-xs font-bold uppercase tracking-wide flex-1" style={{ color: w.color }}>
+                  {w.label}
+                </span>
+                <span className="font-mono text-[10px] text-muted-foreground">{w.dates}</span>
+              </div>
+              {/* Строки */}
+              <div className="divide-y divide-border/40">
+                {rows.map(row => {
+                  const cards = row.cells[w.id] ?? [];
+                  const hasCards = cards.length > 0;
+                  if (!hasCards && locked) return null;
+                  return (
+                    <div key={row.id} className="px-3 py-2">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[11px] font-mono uppercase tracking-wide text-muted-foreground">{row.label}</span>
+                        {!locked && (
+                          <button
+                            onClick={() => addCard(row.id, w.id)}
+                            className="text-[10px] font-mono px-2 py-0.5 rounded transition-colors"
+                            style={{ color: textColor(w.color), backgroundColor: w.color + '18', border: `1px dashed ${w.color}40` }}
+                          >+ задача</button>
+                        )}
+                      </div>
+                      {cards.length > 0 && (
+                        <div className="space-y-1.5">
+                          {cards.map(c => (
+                            <CardItem key={c.id} card={c} weekColor={w.color} locked={locked}
+                              onToggleDone={() => toggleCardDone(row.id, w.id, c.id)}
+                              onUpdateLabel={v => updateCardLabel(row.id, w.id, c.id, v)}
+                              onRemove={() => removeCard(row.id, w.id, c.id)}
+                              draggable={false}
+                              onDragStart={() => {}}
+                              onDragEnd={() => {}}
+                              onDragOver={() => {}}
+                              onDrop={() => {}}
+                              onToggleDay={day => toggleCardDay(row.id, w.id, c.id, day)}
+                            />
+                          ))}
+                        </div>
+                      )}
+                      {cards.length === 0 && !locked && (
+                        <div className="text-[10px] text-muted-foreground/40 font-mono py-1">пусто</div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+
         {/* Bottom controls */}
-        <div className="flex items-center gap-4 text-xs text-muted-foreground font-mono pb-2">
+        <div className="flex items-center gap-2 md:gap-4 text-xs text-muted-foreground font-mono pb-2">
           {!locked && (
             <button
               onClick={addRow}
@@ -810,7 +827,7 @@ export default function GanttPage() {
               + строка
             </button>
           )}
-          <div className="flex items-center gap-4 flex-1">
+          <div className="hidden md:flex items-center gap-4 flex-1">
             {!locked && (
               <>
                 <span>⠿ перетащить строку</span>
@@ -819,6 +836,9 @@ export default function GanttPage() {
               </>
             )}
             {locked && <span className="text-muted-foreground/60">Редактирование заблокировано</span>}
+          </div>
+          <div className="flex-1 md:hidden">
+            {locked && <span className="text-muted-foreground/60">Заблокировано</span>}
           </div>
           {/* Lock button */}
           <button
@@ -830,7 +850,7 @@ export default function GanttPage() {
             title={locked ? 'Разблокировать' : 'Заблокировать редактирование'}
           >
             <span className="text-sm">{locked ? '🔒' : '🔓'}</span>
-            <span>{locked ? 'Заблокировано' : 'Заблокировать'}</span>
+            <span className="hidden md:inline">{locked ? 'Заблокировано' : 'Заблокировать'}</span>
           </button>
         </div>
       </div>
