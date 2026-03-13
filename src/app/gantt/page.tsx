@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { useTheme } from 'next-themes';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -396,6 +397,34 @@ function LockModal({ onClose, onUnlock }: { onClose: () => void; onUnlock: () =>
   );
 }
 
+// ─── Theme toggle ─────────────────────────────────────────────────────────────
+
+function ThemeToggleButton() {
+  const { resolvedTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!mounted) return <div className="w-8 h-8" />;
+  const isDark = resolvedTheme === 'dark';
+  return (
+    <button
+      onClick={() => setTheme(isDark ? 'light' : 'dark')}
+      className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg border border-border hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+      title={isDark ? 'Светлая тема' : 'Тёмная тема'}
+    >
+      {isDark ? (
+        <svg viewBox="0 0 16 16" className="w-4 h-4" fill="none">
+          <circle cx="8" cy="8" r="3.5" stroke="currentColor" strokeWidth="1.3" />
+          <path d="M8 1v1.5M8 13.5V15M1 8h1.5M13.5 8H15M3.05 3.05l1.06 1.06M11.89 11.89l1.06 1.06M3.05 12.95l1.06-1.06M11.89 4.11l1.06-1.06" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+        </svg>
+      ) : (
+        <svg viewBox="0 0 16 16" className="w-4 h-4" fill="none">
+          <path d="M13.5 9.5A6 6 0 0 1 6.5 2.5a6 6 0 1 0 7 7z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      )}
+    </button>
+  );
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 const STORAGE_KEY = 'rocketmind-gantt-v1';
@@ -615,16 +644,19 @@ export default function GanttPage() {
 
       {/* Header */}
       <div className="border-b border-border px-4 md:px-8 py-4 md:py-6">
-        <div className="max-w-[1400px] mx-auto">
-          <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground mb-1">
-            Rocketmind · MVP 1.1
-          </p>
-          <h1 className="font-heading text-2xl md:text-[2rem] font-bold leading-tight">
-            <EditableText value={title} onChange={setTitle} />
-          </h1>
-          <p className="text-muted-foreground mt-1.5 text-sm">
-            <EditableText value={subtitle} onChange={setSubtitle} />
-          </p>
+        <div className="max-w-[1400px] mx-auto flex items-start justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground mb-1">
+              Rocketmind · MVP 1.1
+            </p>
+            <h1 className="font-heading text-2xl md:text-[2rem] font-bold leading-tight">
+              <EditableText value={title} onChange={setTitle} />
+            </h1>
+            <p className="text-muted-foreground mt-1.5 text-sm">
+              <EditableText value={subtitle} onChange={setSubtitle} />
+            </p>
+          </div>
+          <ThemeToggleButton />
         </div>
       </div>
 

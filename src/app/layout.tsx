@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { ThemeProvider, TooltipProvider, Toaster } from "@rocketmind/ui";
+import { Providers } from "@/components/providers";
 
 export const metadata: Metadata = {
   title: "План работ — Rocketmind",
@@ -15,17 +15,9 @@ export default function RootLayout({
   return (
     <html lang="ru" suppressHydrationWarning>
       <body className="antialiased">
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="dark"
-          enableSystem={false}
-          disableTransitionOnChange
-        >
-          <TooltipProvider>
-            {children}
-          </TooltipProvider>
-          <Toaster position="bottom-center" />
-        </ThemeProvider>
+        <Providers>
+          {children}
+        </Providers>
       </body>
     </html>
   );
