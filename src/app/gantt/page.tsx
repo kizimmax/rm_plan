@@ -447,6 +447,14 @@ export default function GanttPage() {
   const [locked, setLocked] = useState(false);
   const [showLockModal, setShowLockModal] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'synced' | 'saving' | 'error' | 'loading'>('loading');
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   // Track whether we've received the first snapshot from Firebase
   const initialized = useRef(false);
@@ -688,7 +696,7 @@ export default function GanttPage() {
     <div className="min-h-screen bg-background text-foreground font-body">
 
       {/* Header */}
-      <div className="border-b border-border px-8 py-6">
+      <div className="border-b border-border px-4 md:px-8 py-4 md:py-6">
         <div className="max-w-[1400px] mx-auto">
           <div className="flex items-center gap-3 mb-1">
             <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground flex-1">
@@ -696,7 +704,7 @@ export default function GanttPage() {
             </p>
             <SyncDot status={syncStatus} />
           </div>
-          <h1 className="font-heading text-[2rem] font-bold leading-tight">
+          <h1 className="font-heading text-[1.5rem] md:text-[2rem] font-bold leading-tight">
             <EditableText value={title} onChange={updateTitle} />
           </h1>
           <p className="text-muted-foreground mt-1.5 text-sm">
@@ -705,10 +713,10 @@ export default function GanttPage() {
         </div>
       </div>
 
-      <div className="max-w-[1400px] mx-auto px-8 py-8 space-y-6">
+      <div className="max-w-[1400px] mx-auto px-4 md:px-8 py-5 md:py-8 space-y-4 md:space-y-6">
 
         {/* Week cards */}
-        <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${weeks.length}, 1fr)` }}>
+        <div className="grid gap-3" style={{ gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : `repeat(${weeks.length}, 1fr)` }}>
           {weeks.map(w => (
             <div key={w.id} className="border border-border rounded-xl p-4 relative overflow-hidden">
               <div className="absolute top-0 left-0 right-0 h-0.5" style={{ backgroundColor: cssVar(w.color, '100') }} />
@@ -725,8 +733,77 @@ export default function GanttPage() {
           ))}
         </div>
 
-        {/* Gantt table */}
-        <div className="border border-border rounded-xl overflow-hidden">
+        {/* Mobile gantt — per-week stacked */}
+        {isMobile && (
+          <div className="space-y-3">
+            {weeks.map(w => (
+              <div key={w.id} className="border border-border rounded-xl overflow-hidden">
+                {/* Week header */}
+                <div className="px-4 py-3 bg-muted/20 border-b border-border relative">
+                  <div className="absolute top-0 left-0 right-0 h-0.5" style={{ backgroundColor: cssVar(w.color, '100') }} />
+                  <div className="font-mono text-[11px] font-bold uppercase tracking-widest pt-0.5" style={{ color: cssVar(w.color, '100') }}>
+                    {w.label} · {w.dates}
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-0.5 leading-snug">{w.theme}</div>
+                </div>
+                {/* Rows for this week */}
+                {rows.map(row => {
+                  const cards = row.cells[w.id] ?? [];
+                  if (locked && cards.length === 0) return null;
+                  return (
+                    <div key={row.id} className="px-3 py-3 border-b border-border/40 last:border-b-0">
+                      <div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-2">
+                        {row.label}
+                      </div>
+                      {!locked && (
+                        <button
+                          onClick={() => addCard(row.id, w.id)}
+                          className="w-full mb-2 flex items-center justify-center gap-1 rounded text-[11px] font-mono uppercase tracking-wide transition-colors"
+                          style={{
+                            height: 24,
+                            color: cssVar(w.color, 'fg-subtle'),
+                            opacity: 0.45,
+                            backgroundColor: cssVar(w.color, '900'),
+                            border: `1px dashed ${cssVar(w.color, '300')}`,
+                          }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '0.85'; }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '0.45'; }}
+                        >
+                          + задача
+                        </button>
+                      )}
+                      <div className="flex flex-col gap-1.5">
+                        {cards.map(c => (
+                          <CardItem
+                            key={c.id}
+                            card={c}
+                            weekColor={w.color}
+                            locked={locked}
+                            onToggleDone={() => toggleCardDone(row.id, w.id, c.id)}
+                            onUpdateLabel={v => updateCardLabel(row.id, w.id, c.id, v)}
+                            onRemove={() => removeCard(row.id, w.id, c.id)}
+                            draggable={false}
+                            onDragStart={() => {}}
+                            onDragEnd={() => {}}
+                            onDragOver={() => {}}
+                            onDrop={() => {}}
+                            onToggleDay={day => toggleCardDay(row.id, w.id, c.id, day)}
+                          />
+                        ))}
+                        {cards.length === 0 && (
+                          <div className="min-h-[24px]" />
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Desktop gantt table */}
+        {!isMobile && <div className="border border-border rounded-xl overflow-hidden">
           <div className="overflow-x-auto">
             <div style={{ minWidth: COL_W + weeks.length * 240 }}>
 
@@ -871,10 +948,10 @@ export default function GanttPage() {
               ))}
             </div>
           </div>
-        </div>
+        </div>}
 
         {/* Bottom controls */}
-        <div className="flex items-center gap-4 text-xs text-muted-foreground font-mono pb-2">
+        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground font-mono pb-2">
           {!locked && (
             <button
               onClick={addRow}
@@ -883,22 +960,27 @@ export default function GanttPage() {
               + строка
             </button>
           )}
-          <div className="flex items-center gap-4 flex-1">
-            {!locked && (
-              <>
-                <span>⠿ перетащить строку</span>
-                <span>⬌ перетащить карточку</span>
-                <span>двойной клик — редактировать</span>
-              </>
-            )}
-            {locked && <span className="text-muted-foreground/60">Редактирование заблокировано</span>}
-          </div>
+          {!isMobile && (
+            <div className="flex items-center gap-4 flex-1">
+              {!locked && (
+                <>
+                  <span>⠿ перетащить строку</span>
+                  <span>⬌ перетащить карточку</span>
+                  <span>двойной клик — редактировать</span>
+                </>
+              )}
+              {locked && <span className="text-muted-foreground/60">Редактирование заблокировано</span>}
+            </div>
+          )}
+          {isMobile && locked && (
+            <span className="text-muted-foreground/60 flex-1">Редактирование заблокировано</span>
+          )}
           <button
             onClick={() => {
               if (locked) { setShowLockModal(true); }
               else { updateLocked(true); }
             }}
-            className="flex-shrink-0 flex items-center gap-1.5 border border-border rounded-lg px-3 py-1.5 hover:bg-muted transition-colors text-foreground"
+            className="flex-shrink-0 flex items-center gap-1.5 border border-border rounded-lg px-3 py-1.5 hover:bg-muted transition-colors text-foreground ml-auto"
             title={locked ? 'Разблокировать' : 'Заблокировать редактирование'}
           >
             <span className="text-sm">{locked ? '🔒' : '🔓'}</span>
