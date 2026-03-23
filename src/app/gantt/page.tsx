@@ -432,8 +432,46 @@ function migrateColor(c: unknown): ColorToken {
   return 'violet';
 }
 
-function migrateWeeks(raw: unknown[]): Week[] {
-  return raw.map((w: unknown) => {
+// Firebase drops empty arrays → come back as null/undefined.
+// Also, arrays may come back as objects with integer keys.
+function toArray<T>(raw: unknown): T[] {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw as T[];
+  return Object.values(raw as Record<string, unknown>) as T[];
+}
+
+function normalizeCard(raw: unknown): Card {
+  const c = raw as Card;
+  const days = !c.days
+    ? []
+    : Array.isArray(c.days)
+    ? c.days
+    : (Object.values(c.days as Record<string, Day>) as Day[]);
+  return { ...c, days };
+}
+
+function normalizeRows(raw: unknown): Row[] {
+  return toArray<Row>(raw).filter(Boolean).map((rawRow: unknown) => {
+    const row = rawRow as Row;
+    const rawCells = row.cells as unknown;
+    const cells: Record<string, Card[]> = {};
+    if (rawCells && typeof rawCells === 'object') {
+      for (const [key, value] of Object.entries(rawCells as Record<string, unknown>)) {
+        if (!value) {
+          cells[key] = [];
+        } else if (Array.isArray(value)) {
+          cells[key] = value.map(normalizeCard);
+        } else {
+          cells[key] = Object.values(value as Record<string, unknown>).map(normalizeCard);
+        }
+      }
+    }
+    return { ...row, cells };
+  });
+}
+
+function normalizeWeeks(raw: unknown): Week[] {
+  return toArray<Week>(raw).filter(Boolean).map((w: unknown) => {
     const week = w as Week;
     return { ...week, color: migrateColor(week.color) };
   });
@@ -470,8 +508,8 @@ export default function GanttPage() {
         const data = snapshot.val();
         remoteUpdate.current = true;
         if (data) {
-          if (data.weeks) setWeeks(migrateWeeks(data.weeks));
-          if (data.rows) setRows(data.rows);
+          if (data.weeks) setWeeks(normalizeWeeks(data.weeks));
+          if (data.rows) setRows(normalizeRows(data.rows));
           if (data.title) setTitle(data.title);
           if (data.subtitle) setSubtitle(data.subtitle);
           if (data.locked !== undefined) setLocked(data.locked);
@@ -748,7 +786,7 @@ export default function GanttPage() {
                 </div>
                 {/* Rows for this week */}
                 {rows.map(row => {
-                  const cards = row.cells[w.id] ?? [];
+                  const cards = (row.cells ?? {})[w.id] ?? [];
                   if (locked && cards.length === 0) return null;
                   return (
                     <div key={row.id} className="px-3 py-3 border-b border-border/40 last:border-b-0">
@@ -872,7 +910,7 @@ export default function GanttPage() {
 
                   {/* Week cells */}
                   {weeks.map(w => {
-                    const cards = row.cells[w.id] ?? [];
+                    const cards = (row.cells ?? {})[w.id] ?? [];
                     return (
                       <div
                         key={w.id}
