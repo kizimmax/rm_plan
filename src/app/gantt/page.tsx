@@ -238,7 +238,7 @@ function CardItem({
           ? `color-mix(in srgb, ${cssVar(weekColor, '900')}, transparent 55%)`
           : cssVar(weekColor, '900'),
         border: `1px solid ${c.done
-          ? `color-mix(in srgb, ${cssVar(weekColor, '300')}, transparent 60%)`
+          ? `color-mix(in srgb, ${cssVar(weekColor, '300')}, transparent 80%)`
           : cssVar(weekColor, '300')}`,
         cursor: editing ? 'default' : 'grab',
       }}
@@ -275,7 +275,7 @@ function CardItem({
                   borderRadius: 3,
                   backgroundColor: active ? cssVar(weekColor, '100') : cssVar(weekColor, '900'),
                   color: active ? cssVar(weekColor, 'fg') : cssVar(weekColor, 'fg-subtle'),
-                  opacity: active ? 1 : 0.6,
+                  opacity: active ? (c.done ? 0.45 : 1) : (c.done ? 0.25 : 0.6),
                   border: `1px solid ${active ? cssVar(weekColor, '100') : cssVar(weekColor, '300')}`,
                 }}
                 title={day}
@@ -936,7 +936,7 @@ export default function GanttPage() {
                           onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '0.85'; }}
                           onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '0.45'; }}
                         >
-                          + задача
+                          +
                         </button>
                       )}
                       <div className="flex flex-col gap-1.5">
@@ -1065,7 +1065,7 @@ export default function GanttPage() {
                             onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '0.35'; }}
                             title="Добавить задачу"
                           >
-                            + задача
+                            +
                           </button>
                         )}
 
