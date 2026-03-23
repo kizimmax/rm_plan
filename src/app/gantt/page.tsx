@@ -38,6 +38,10 @@ type Row = {
   cells: Record<string, Card[]>; // weekId → список карточек
 };
 
+type PendingDelete =
+  | { type: 'card'; label: string; rowId: string; weekId: string; card: Card; index: number }
+  | { type: 'row'; label: string; row: Row; index: number };
+
 // ─── Initial data ─────────────────────────────────────────────────────────────
 
 const INITIAL_WEEKS: Week[] = [
@@ -411,6 +415,64 @@ function SyncDot({ status }: { status: 'synced' | 'saving' | 'error' | 'loading'
   );
 }
 
+// ─── Undo toast (bottom-right) ────────────────────────────────────────────────
+
+function UndoToast({
+  pending, timeLeft, onUndo, onDismiss,
+}: {
+  pending: PendingDelete; timeLeft: number; onUndo: () => void; onDismiss: () => void;
+}) {
+  const firstLine = pending.label.split('\n')[0].slice(0, 38);
+  const caption = pending.type === 'card' ? `«${firstLine}»` : `строка «${firstLine}»`;
+  const pct = (timeLeft / 10) * 100;
+  return (
+    <div
+      className="fixed bottom-6 right-6 z-50 w-72 rounded-xl border border-border bg-background overflow-hidden"
+      style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.14)' }}
+    >
+      {/* countdown bar */}
+      <div className="h-[3px] bg-border">
+        <div
+          className="h-full transition-all duration-1000 ease-linear"
+          style={{ width: `${pct}%`, backgroundColor: 'var(--primary)' }}
+        />
+      </div>
+      <div className="px-4 py-3">
+        <div className="flex items-start gap-2">
+          <div className="flex-1 min-w-0">
+            <div className="text-[12px] font-medium text-foreground leading-snug truncate">{caption}</div>
+            <div className="text-[11px] text-muted-foreground mt-0.5 font-mono">удалена · {timeLeft}с до подтверждения</div>
+          </div>
+          <button
+            onClick={onDismiss}
+            className="flex-shrink-0 w-5 h-5 flex items-center justify-center rounded text-muted-foreground/40 hover:text-muted-foreground transition-colors text-lg leading-none"
+            title="Закрыть"
+          >×</button>
+        </div>
+        <button
+          onClick={onUndo}
+          className="mt-2.5 w-full rounded-lg py-1.5 text-xs font-medium border border-border hover:bg-muted transition-colors"
+        >
+          Отменить удаление
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Top mini notice ───────────────────────────────────────────────────────────
+
+function TopNotice({ message }: { message: string }) {
+  return (
+    <div
+      className="fixed top-4 left-1/2 z-50 -translate-x-1/2 px-4 py-1.5 rounded-full border border-border bg-background text-[11px] text-muted-foreground font-mono select-none pointer-events-none whitespace-nowrap"
+      style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.08)' }}
+    >
+      {message}
+    </div>
+  );
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 const DB_PATH = 'gantt';
@@ -486,6 +548,10 @@ export default function GanttPage() {
   const [showLockModal, setShowLockModal] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'synced' | 'saving' | 'error' | 'loading'>('loading');
   const [isMobile, setIsMobile] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
+  const [deleteTimeLeft, setDeleteTimeLeft] = useState(10);
+  const [topNotice, setTopNotice] = useState<string | null>(null);
+  const topNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
@@ -493,6 +559,59 @@ export default function GanttPage() {
     window.addEventListener('resize', check);
     return () => window.removeEventListener('resize', check);
   }, []);
+
+  // ── Undo / delete toast logic ─────────────────────────────────────────────
+
+  const showTopNotice = useCallback((msg: string) => {
+    setTopNotice(msg);
+    if (topNoticeTimerRef.current) clearTimeout(topNoticeTimerRef.current);
+    topNoticeTimerRef.current = setTimeout(() => setTopNotice(null), 2500);
+  }, []);
+
+  useEffect(() => {
+    if (!pendingDelete) return;
+    if (deleteTimeLeft <= 0) {
+      const msg = pendingDelete.type === 'card' ? 'Задача удалена' : 'Строка удалена';
+      setPendingDelete(null);
+      showTopNotice(msg);
+      return;
+    }
+    const t = setTimeout(() => setDeleteTimeLeft(n => n - 1), 1000);
+    return () => clearTimeout(t);
+  }, [pendingDelete, deleteTimeLeft, showTopNotice]);
+
+  const startDeleteToast = useCallback((pending: PendingDelete) => {
+    setPendingDelete(prev => {
+      if (prev) showTopNotice(prev.type === 'card' ? 'Задача удалена' : 'Строка удалена');
+      return pending;
+    });
+    setDeleteTimeLeft(10);
+  }, [showTopNotice]);
+
+  const handleUndoDelete = () => {
+    if (!pendingDelete) return;
+    if (pendingDelete.type === 'card') {
+      const next = rows.map(r => {
+        if (r.id !== pendingDelete.rowId) return r;
+        const arr = [...((r.cells ?? {})[pendingDelete.weekId] ?? [])];
+        arr.splice(pendingDelete.index, 0, pendingDelete.card);
+        return { ...r, cells: { ...r.cells, [pendingDelete.weekId]: arr } };
+      });
+      updateRows(next);
+    } else {
+      const next = [...rows];
+      next.splice(pendingDelete.index, 0, pendingDelete.row);
+      updateRows(next);
+    }
+    setPendingDelete(null);
+  };
+
+  const handleDismissToast = () => {
+    if (!pendingDelete) return;
+    const msg = pendingDelete.type === 'card' ? 'Задача удалена' : 'Строка удалена';
+    setPendingDelete(null);
+    showTopNotice(msg);
+  };
 
   // Track whether we've received the first snapshot from Firebase
   const initialized = useRef(false);
@@ -665,12 +784,17 @@ export default function GanttPage() {
   };
 
   const removeCard = (rowId: string, weekId: string, cardId: string) => {
+    const srcRow = rows.find(r => r.id === rowId);
+    const srcCards = (srcRow?.cells ?? {})[weekId] ?? [];
+    const index = srcCards.findIndex(c => c.id === cardId);
+    const cardData = index >= 0 ? srcCards[index] : null;
     const next = rows.map(r =>
       r.id === rowId
-        ? { ...r, cells: { ...r.cells, [weekId]: (r.cells[weekId] ?? []).filter(c => c.id !== cardId) } }
+        ? { ...r, cells: { ...r.cells, [weekId]: srcCards.filter(c => c.id !== cardId) } }
         : r
     );
     updateRows(next);
+    if (cardData) startDeleteToast({ type: 'card', label: cardData.label, rowId, weekId, card: cardData, index });
   };
 
   const updateCardLabel = (rowId: string, weekId: string, cardId: string, val: string) => {
@@ -724,7 +848,12 @@ export default function GanttPage() {
     updateRows([...rows, { id, label: 'Новый раздел', cells }]);
   };
 
-  const removeRow = (rowId: string) => updateRows(rows.filter(r => r.id !== rowId));
+  const removeRow = (rowId: string) => {
+    const index = rows.findIndex(r => r.id === rowId);
+    const rowData = index >= 0 ? rows[index] : null;
+    updateRows(rows.filter(r => r.id !== rowId));
+    if (rowData) startDeleteToast({ type: 'row', label: rowData.label, row: rowData, index });
+  };
 
   // ──────────────────────────────────────────────────────────────────────────
 
@@ -899,13 +1028,15 @@ export default function GanttPage() {
                     <span className="text-xs font-medium text-foreground flex-1 min-w-0 mt-0.5">
                       <EditableText value={row.label} onChange={v => updateRowLabel(row.id, v)} />
                     </span>
-                    <button
-                      onClick={() => removeRow(row.id)}
-                      className="flex-shrink-0 text-muted-foreground/20 hover:text-destructive transition-colors text-sm leading-none mt-0.5"
-                      title="Удалить строку"
-                    >
-                      ×
-                    </button>
+                    {!locked && (
+                      <button
+                        onClick={() => removeRow(row.id)}
+                        className="flex-shrink-0 text-muted-foreground/20 hover:text-destructive transition-colors text-sm leading-none mt-0.5"
+                        title="Удалить строку"
+                      >
+                        ×
+                      </button>
+                    )}
                   </div>
 
                   {/* Week cells */}
@@ -1033,6 +1164,17 @@ export default function GanttPage() {
           onUnlock={() => { updateLocked(false); setShowLockModal(false); }}
         />
       )}
+
+      {pendingDelete && (
+        <UndoToast
+          pending={pendingDelete}
+          timeLeft={deleteTimeLeft}
+          onUndo={handleUndoDelete}
+          onDismiss={handleDismissToast}
+        />
+      )}
+
+      {topNotice && <TopNotice message={topNotice} />}
     </div>
   );
 }
