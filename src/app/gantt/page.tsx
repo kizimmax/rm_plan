@@ -533,6 +533,7 @@ export default function GanttPage() {
 
   // Track whether we've received the first snapshot from Firebase
   const initialized = useRef(false);
+  const [loaded, setLoaded] = useState(false);
   // Suppress writes while receiving remote update
   const remoteUpdate = useRef(false);
   // Track initial scroll
@@ -621,6 +622,7 @@ export default function GanttPage() {
           }
         }
         initialized.current = true;
+        setLoaded(true);
         setSyncStatus('synced');
         // reset flag after state updates are flushed
         setTimeout(() => { remoteUpdate.current = false; }, 0);
@@ -629,6 +631,7 @@ export default function GanttPage() {
         console.error('Firebase error:', error);
         setSyncStatus('error');
         initialized.current = true;
+        setLoaded(true);
       }
     );
     return () => unsub();
@@ -1039,7 +1042,7 @@ export default function GanttPage() {
         </div>
 
         {/* Gantt table */}
-        <div className="border border-border rounded-xl overflow-hidden">
+        <div className="border border-border rounded-xl overflow-hidden relative">
           <div style={{ overflow: 'hidden' }}>
             <div style={{
               minWidth: isMobile ? '100%' : COL_W + shownWeeks.length * 240,
@@ -1233,6 +1236,38 @@ export default function GanttPage() {
               ))}
             </div>
           </div>
+
+          {/* Skeleton overlay while loading from Firebase */}
+          {!loaded && (
+            <div className="absolute inset-0 z-20 bg-background/95 flex flex-col">
+              {/* Skeleton header */}
+              <div className="flex border-b border-border">
+                <div className="flex-shrink-0 px-4 py-4" style={isMobile ? { width: '30%' } : { width: COL_W }}>
+                  <div className="h-3 w-16 rounded bg-muted animate-pulse" />
+                </div>
+                {Array.from({ length: effectiveCount }).map((_, i) => (
+                  <div key={i} className="flex-1 px-3 py-3 border-l border-border">
+                    <div className="h-3 w-20 rounded bg-muted animate-pulse mb-2" />
+                    <div className="h-2 w-28 rounded bg-muted/60 animate-pulse" />
+                  </div>
+                ))}
+              </div>
+              {/* Skeleton rows */}
+              {[0, 1, 2, 3].map(r => (
+                <div key={r} className="flex border-b border-border/40">
+                  <div className="flex-shrink-0 px-4 py-4" style={isMobile ? { width: '30%' } : { width: COL_W }}>
+                    <div className="h-3 w-20 rounded bg-muted animate-pulse" />
+                  </div>
+                  {Array.from({ length: effectiveCount }).map((_, i) => (
+                    <div key={i} className="flex-1 px-3 py-3 border-l border-border/40 space-y-2">
+                      <div className="h-16 rounded-lg bg-muted/50 animate-pulse" />
+                      <div className="h-12 rounded-lg bg-muted/30 animate-pulse" />
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Bottom controls */}
