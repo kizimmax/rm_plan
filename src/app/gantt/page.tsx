@@ -942,6 +942,12 @@ export default function GanttPage() {
   const [keyValue, setKeyValue] = useState('');
   const [groqKey, setGroqKey] = useState<string | null>(null);
 
+  // Default dark theme
+  useEffect(() => {
+    document.documentElement.classList.add('dark');
+    document.documentElement.classList.remove('light');
+  }, []);
+
   // Load Groq key from Firebase on mount
   useEffect(() => {
     const keyRef = ref(db, 'gantt_config/groq_api_key');
