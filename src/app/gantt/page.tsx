@@ -436,43 +436,11 @@ function LockModal({ onClose, onUnlock }: { onClose: () => void; onUnlock: () =>
   );
 }
 
-// ─── Summary modal ────────────────────────────────────────────────────────────
-
-function SummaryModal({ weekLabel, text, onClose }: { weekLabel: string; text: string; onClose: () => void }) {
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ backgroundColor: 'var(--rm-gray-alpha-600)' }}
-      onClick={onClose}
-    >
-      <div
-        className="bg-background border border-border rounded-2xl p-6 w-[480px] max-h-[80vh] shadow-lg flex flex-col"
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between mb-4">
-          <div className="font-heading font-bold text-[length:var(--text-16)]">Итог: {weekLabel}</div>
-          <button
-            onClick={onClose}
-            className="text-muted-foreground hover:text-foreground transition-colors text-[length:var(--text-16)] leading-none"
-          >
-            &times;
-          </button>
-        </div>
-        <div className="overflow-y-auto">
-          <pre className="whitespace-pre-wrap font-body text-[length:var(--text-12)] text-muted-foreground leading-relaxed">
-            {text}
-          </pre>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ─── Sync indicator ───────────────────────────────────────────────────────────
 
 function SyncDot({ status }: { status: 'synced' | 'saving' | 'error' | 'loading' }) {
   const map = {
-    loading: { color: 'var(--rm-gray-4)', label: 'Загрузка…' },
+    loading: { color: 'var(--rm-gray-5)', label: 'Загрузка…' },
     saving:  { color: 'var(--rm-yellow-100)', label: 'Сохранение…' },
     synced:  { color: 'var(--rm-green-100)', label: 'Синхронизировано' },
     error:   { color: 'var(--rm-red-100)', label: 'Ошибка синхронизации' },
@@ -531,8 +499,7 @@ export default function GanttPage() {
   // Week navigation
   const [visibleStartIdx, setVisibleStartIdx] = useState(0);
 
-  // Summary popup
-  const [summaryPopup, setSummaryPopup] = useState<{ weekId: string; text: string; weekLabel: string } | null>(null);
+  // Summary loading
   const [summaryLoading, setSummaryLoading] = useState<string | null>(null);
 
   // Track whether we've received the first snapshot from Firebase
@@ -847,39 +814,38 @@ export default function GanttPage() {
     const doneTasks = sections.reduce((s, sec) => s + sec.done, 0);
     const pct = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
 
-    let text = '';
+    // Build a short 2-line summary of key results
+    let line1 = '';
+    let line2 = '';
 
     if (totalTasks === 0) {
-      text = 'На эту неделю пока нет задач.';
+      line1 = 'Нет задач на неделю';
     } else {
-      text += `Прогресс: ${doneTasks} из ${totalTasks} (${pct}%)\n\n`;
+      // Line 1: progress + key deliverables (extract first meaningful word from each task)
+      const keyResults = sections
+        .flatMap(s => s.tasks.map(t => t.label))
+        .map(l => l.replace(/^(DS |MVP |QA |Auth |End-to-end )?/, '').split(/[,:+·—–]/)[0].trim())
+        .filter(Boolean)
+        .slice(0, 4);
+      line1 = `${doneTasks}/${totalTasks} — ${keyResults.join(', ')}`;
 
-      const activeAreas = sections.map(s => s.name);
-      text += `Направления: ${activeAreas.join(', ')}\n\n`;
-
-      sections.forEach(s => {
-        const status = s.done === s.total ? 'Готово' : `${s.done}/${s.total}`;
-        text += `${s.name} [${status}]:\n`;
-        s.tasks.forEach(t => {
-          text += `  ${t.done ? '[x]' : '[ ]'} ${t.label}\n`;
-        });
-        text += '\n';
-      });
-
+      // Line 2: status assessment
+      const openTasks = sections
+        .flatMap(s => s.tasks.filter(t => !t.done))
+        .map(t => t.label.split(/[,\n]/)[0].trim())
+        .slice(0, 2);
       if (pct === 100) {
-        text += 'Все задачи выполнены.';
-      } else if (pct >= 75) {
-        text += `Неделя почти завершена. Осталось ${totalTasks - doneTasks} задач(и).`;
-      } else if (pct >= 50) {
-        text += `Прогресс на середине. ${totalTasks - doneTasks} задач(и) в работе.`;
-      } else {
-        text += `В начале пути. ${totalTasks - doneTasks} задач(и) впереди.`;
+        line2 = 'Все задачи закрыты';
+      } else if (openTasks.length > 0) {
+        line2 = `В работе: ${openTasks.join(', ')}`;
       }
     }
 
-    // Simulate brief processing delay for UX feedback
+    const summary = line2 ? `${line1}\n${line2}` : line1;
+
+    // Write summary into the week's theme field
     setTimeout(() => {
-      setSummaryPopup({ weekId, text, weekLabel: `${week.label} · ${week.dates}` });
+      updateWeekTheme(weekId, summary);
       setSummaryLoading(null);
     }, 300);
   };
@@ -1204,13 +1170,6 @@ export default function GanttPage() {
         />
       )}
 
-      {summaryPopup && (
-        <SummaryModal
-          weekLabel={summaryPopup.weekLabel}
-          text={summaryPopup.text}
-          onClose={() => setSummaryPopup(null)}
-        />
-      )}
     </div>
   );
 }
