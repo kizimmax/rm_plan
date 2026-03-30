@@ -798,14 +798,14 @@ export default function GanttPage() {
     setVisibleStartIdx(Math.max(0, idx + 1 - VISIBLE_COUNT));
   };
 
-  // ── Generate week summary (AI-powered) ───────────────────────────────────
+  // ── Generate week summary (AI-powered via OpenAI) ────────────────────────
 
-  const getAnthropicKey = (): string | null => {
-    const stored = localStorage.getItem('anthropic_api_key');
+  const getOpenAIKey = (): string | null => {
+    const stored = localStorage.getItem('openai_api_key');
     if (stored) return stored;
-    const key = prompt('Введите Anthropic API ключ для AI-саммери:');
+    const key = prompt('Введите OpenAI API ключ для AI-саммери:');
     if (key?.trim()) {
-      localStorage.setItem('anthropic_api_key', key.trim());
+      localStorage.setItem('openai_api_key', key.trim());
       return key.trim();
     }
     return null;
@@ -817,7 +817,6 @@ export default function GanttPage() {
 
     setSummaryLoading(weekId);
 
-    // Collect all cards for this week
     const taskLines: string[] = [];
     rows.forEach(row => {
       const cards = row.cells[weekId] ?? [];
@@ -833,38 +832,35 @@ export default function GanttPage() {
       return;
     }
 
-    const apiKey = getAnthropicKey();
+    const apiKey = getOpenAIKey();
     if (!apiKey) {
       setSummaryLoading(null);
       return;
     }
 
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true',
+          'Authorization': `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
+          model: 'gpt-4o-mini',
           max_tokens: 120,
-          messages: [{
-            role: 'user',
-            content: `Ты — помощник проджект-менеджера. Вот список задач на неделю "${week.label}" (${week.dates}):\n\n${taskLines.join('\n')}\n\nНапиши ОДНУ строку (до 80 символов) — краткий итог/фокус этой недели на русском. Не используй маркеры списка, не повторяй название недели. Только суть: что будет сделано или достигнуто. Формат: "N/M · краткий итог" где N — сделано, M — всего задач.`,
-          }],
+          messages: [
+            { role: 'system', content: 'Ты — помощник проджект-менеджера. Отвечай строго одной строкой на русском.' },
+            { role: 'user', content: `Вот список задач на неделю "${week.label}" (${week.dates}):\n\n${taskLines.join('\n')}\n\nНапиши ОДНУ строку (до 80 символов) — краткий итог/фокус этой недели. Не используй маркеры списка, не повторяй название недели. Только суть: что будет сделано или достигнуто. Формат: "N/M · краткий итог" где N — сделано, M — всего задач.` },
+          ],
         }),
       });
 
       if (!res.ok) {
-        const err = await res.text();
         if (res.status === 401) {
-          localStorage.removeItem('anthropic_api_key');
+          localStorage.removeItem('openai_api_key');
           alert('Неверный API ключ. Попробуйте ещё раз.');
         } else {
-          console.error('Anthropic API error:', err);
+          console.error('OpenAI API error:', res.status);
           alert('Ошибка API: ' + res.status);
         }
         setSummaryLoading(null);
@@ -872,7 +868,7 @@ export default function GanttPage() {
       }
 
       const data = await res.json();
-      const text = data.content?.[0]?.text?.trim() ?? '';
+      const text = data.choices?.[0]?.message?.content?.trim() ?? '';
       if (text) {
         updateWeekTheme(weekId, text);
       }
