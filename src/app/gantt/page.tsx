@@ -798,63 +798,90 @@ export default function GanttPage() {
     setVisibleStartIdx(Math.max(0, idx + 1 - VISIBLE_COUNT));
   };
 
-  // ── Generate week summary ─────────────────────────────────────────────────
+  // ── Generate week summary (AI-powered) ───────────────────────────────────
 
-  const generateWeekSummary = (weekId: string) => {
-    const weekIdx = weeks.findIndex(w => w.id === weekId);
-    const week = weeks[weekIdx];
+  const getAnthropicKey = (): string | null => {
+    const stored = localStorage.getItem('anthropic_api_key');
+    if (stored) return stored;
+    const key = prompt('Введите Anthropic API ключ для AI-саммери:');
+    if (key?.trim()) {
+      localStorage.setItem('anthropic_api_key', key.trim());
+      return key.trim();
+    }
+    return null;
+  };
+
+  const generateWeekSummary = async (weekId: string) => {
+    const week = weeks.find(w => w.id === weekId);
     if (!week) return;
 
     setSummaryLoading(weekId);
 
     // Collect all cards for this week
-    const sections: { name: string; total: number; done: number; tasks: { label: string; done: boolean }[] }[] = [];
+    const taskLines: string[] = [];
     rows.forEach(row => {
       const cards = row.cells[weekId] ?? [];
-      if (cards.length > 0) {
-        sections.push({
-          name: row.label,
-          total: cards.length,
-          done: cards.filter(c => c.done).length,
-          tasks: cards.map(c => ({ label: c.label.split('\n')[0], done: c.done })),
-        });
-      }
+      cards.forEach(c => {
+        const status = c.done ? '✅' : '⬜';
+        taskLines.push(`${status} [${row.label}] ${c.label.split('\n')[0]}`);
+      });
     });
 
-    const totalTasks = sections.reduce((s, sec) => s + sec.total, 0);
-    const doneTasks = sections.reduce((s, sec) => s + sec.done, 0);
-
-    // Extract short key phrases from task labels
-    let summary = '';
-    if (totalTasks === 0) {
-      summary = 'Нет задач';
-    } else {
-      const phrases = sections
-        .flatMap(s => s.tasks.map(t => t.label))
-        .map(label => {
-          // Take text before long delimiters, strip noise
-          const short = label
-            .split(/\n/)[0]                          // first line only
-            .split(/\s*[—–:]\s*/)[0]                 // before em-dash or colon
-            .replace(/\(.*?\)/g, '')                  // remove parentheticals
-            .replace(/\d+[–-]\d+\s*/g, '')            // remove ranges like "8–15"
-            .trim();
-          // Cap at ~30 chars, cut at last word boundary
-          if (short.length <= 30) return short;
-          return short.slice(0, 30).replace(/\s+\S*$/, '') + '…';
-        })
-        .filter(Boolean);
-
-      // Deduplicate and take top 4
-      const unique = [...new Set(phrases)].slice(0, 4);
-      summary = `${doneTasks}/${totalTasks} · ${unique.join(' + ')}`;
+    if (taskLines.length === 0) {
+      updateWeekTheme(weekId, 'Нет задач');
+      setSummaryLoading(null);
+      return;
     }
 
-    // Write summary into the week's theme field
-    setTimeout(() => {
-      updateWeekTheme(weekId, summary);
+    const apiKey = getAnthropicKey();
+    if (!apiKey) {
       setSummaryLoading(null);
-    }, 300);
+      return;
+    }
+
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 120,
+          messages: [{
+            role: 'user',
+            content: `Ты — помощник проджект-менеджера. Вот список задач на неделю "${week.label}" (${week.dates}):\n\n${taskLines.join('\n')}\n\nНапиши ОДНУ строку (до 80 символов) — краткий итог/фокус этой недели на русском. Не используй маркеры списка, не повторяй название недели. Только суть: что будет сделано или достигнуто. Формат: "N/M · краткий итог" где N — сделано, M — всего задач.`,
+          }],
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.text();
+        if (res.status === 401) {
+          localStorage.removeItem('anthropic_api_key');
+          alert('Неверный API ключ. Попробуйте ещё раз.');
+        } else {
+          console.error('Anthropic API error:', err);
+          alert('Ошибка API: ' + res.status);
+        }
+        setSummaryLoading(null);
+        return;
+      }
+
+      const data = await res.json();
+      const text = data.content?.[0]?.text?.trim() ?? '';
+      if (text) {
+        updateWeekTheme(weekId, text);
+      }
+    } catch (e) {
+      console.error('AI summary error:', e);
+      alert('Ошибка сети при вызове AI');
+    } finally {
+      setSummaryLoading(null);
+    }
   };
 
   // ──────────────────────────────────────────────────────────────────────────
