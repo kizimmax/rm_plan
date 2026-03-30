@@ -908,7 +908,8 @@ export default function GanttPage() {
       if (!res.ok) {
         const errBody = await res.text().catch(() => '');
         if (res.status === 401) {
-          localStorage.removeItem('groq_api_key');
+          set(ref(db, 'gantt_config/groq_api_key'), null);
+          setGroqKey(null);
           updateWeekTheme(weekId, 'Неверный ключ');
           setPendingWeekId(weekId);
           setKeyValue('');
@@ -935,11 +936,21 @@ export default function GanttPage() {
   };
 
   const [keyValue, setKeyValue] = useState('');
+  const [groqKey, setGroqKey] = useState<string | null>(null);
+
+  // Load Groq key from Firebase on mount
+  useEffect(() => {
+    const keyRef = ref(db, 'gantt_config/groq_api_key');
+    const unsub = onValue(keyRef, (snap) => {
+      const val = snap.val();
+      if (val) setGroqKey(val);
+    });
+    return () => unsub();
+  }, []);
 
   const generateWeekSummary = (weekId: string) => {
-    const stored = localStorage.getItem('groq_api_key');
-    if (stored) {
-      callAI(weekId, stored);
+    if (groqKey) {
+      callAI(weekId, groqKey);
     } else {
       setPendingWeekId(weekId);
       setKeyValue('');
@@ -950,7 +961,9 @@ export default function GanttPage() {
   const handleKeySubmit = () => {
     const val = keyValue.trim();
     if (!val || !pendingWeekId) return;
-    localStorage.setItem('groq_api_key', val);
+    // Save to Firebase so all devices can use it
+    set(ref(db, 'gantt_config/groq_api_key'), val);
+    setGroqKey(val);
     setShowKeyInput(false);
     const wid = pendingWeekId;
     setPendingWeekId(null);
