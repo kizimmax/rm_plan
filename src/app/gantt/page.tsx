@@ -801,7 +801,7 @@ export default function GanttPage() {
     setVisibleStartIdx(Math.max(0, idx + 1 - VISIBLE_COUNT));
   };
 
-  // ── Generate week summary (AI-powered via Anthropic Claude) ──────────────
+  // ── Generate week summary (AI-powered via Google Gemini) ─────────────────
 
   const callAI = async (weekId: string, apiKey: string) => {
     const week = weeks.find(w => w.id === weekId);
@@ -824,28 +824,21 @@ export default function GanttPage() {
       return;
     }
 
+    const prompt = `Ты — помощник проджект-менеджера. Вот список задач на неделю "${week.label}" (${week.dates}):\n\n${taskLines.join('\n')}\n\nНапиши ОДНУ строку (до 80 символов) — краткий итог/фокус этой недели на русском. Не используй маркеры списка, не повторяй название недели. Только суть: что будет сделано или достигнуто. Формат: "N/M · краткий итог" где N — сделано, M — всего задач.`;
+
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 120,
-          messages: [{
-            role: 'user',
-            content: `Ты — помощник проджект-менеджера. Вот список задач на неделю "${week.label}" (${week.dates}):\n\n${taskLines.join('\n')}\n\nНапиши ОДНУ строку (до 80 символов) — краткий итог/фокус этой недели на русском. Не используй маркеры списка, не повторяй название недели. Только суть: что будет сделано или достигнуто. Формат: "N/M · краткий итог" где N — сделано, M — всего задач.`,
-          }],
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { maxOutputTokens: 120 },
         }),
       });
 
       if (!res.ok) {
-        if (res.status === 401) {
-          localStorage.removeItem('anthropic_api_key');
+        if (res.status === 400 || res.status === 403) {
+          localStorage.removeItem('gemini_api_key');
           setShowKeyInput(true);
           setPendingWeekId(weekId);
           alert('Неверный API ключ. Введите другой.');
@@ -857,7 +850,7 @@ export default function GanttPage() {
       }
 
       const data = await res.json();
-      const text = data.content?.[0]?.text?.trim() ?? '';
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? '';
       if (text) updateWeekTheme(weekId, text);
     } catch (e) {
       console.error('AI summary error:', e);
@@ -870,7 +863,7 @@ export default function GanttPage() {
   const [keyValue, setKeyValue] = useState('');
 
   const generateWeekSummary = (weekId: string) => {
-    const stored = localStorage.getItem('anthropic_api_key');
+    const stored = localStorage.getItem('gemini_api_key');
     if (stored) {
       callAI(weekId, stored);
     } else {
@@ -883,7 +876,7 @@ export default function GanttPage() {
   const handleKeySubmit = () => {
     const val = keyValue.trim();
     if (!val || !pendingWeekId) return;
-    localStorage.setItem('anthropic_api_key', val);
+    localStorage.setItem('gemini_api_key', val);
     setShowKeyInput(false);
     const wid = pendingWeekId;
     setPendingWeekId(null);
@@ -901,12 +894,12 @@ export default function GanttPage() {
       {showKeyInput && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => { setShowKeyInput(false); setPendingWeekId(null); }}>
           <div className="bg-background border border-border rounded-lg p-6 shadow-xl max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
-            <p className="font-heading text-[length:var(--text-16)] font-bold mb-1">Anthropic API Key</p>
-            <p className="text-muted-foreground text-[length:var(--text-12)] mb-4">Ключ сохранится в браузере</p>
+            <p className="font-heading text-[length:var(--text-16)] font-bold mb-1">Google Gemini API Key</p>
+            <p className="text-muted-foreground text-[length:var(--text-12)] mb-4">Бесплатно на <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" style={{textDecoration:'underline'}}>aistudio.google.com/apikey</a></p>
             <input
               autoFocus
               type="password"
-              placeholder="sk-ant-..."
+              placeholder="AIza..."
               value={keyValue}
               onChange={e => setKeyValue(e.target.value)}
               className="w-full px-3 py-2 rounded border border-border bg-background text-foreground font-mono text-[length:var(--text-14)] mb-3 outline-none focus:border-muted-foreground"
