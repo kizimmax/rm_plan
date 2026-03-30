@@ -465,10 +465,7 @@ function SyncDot({ status }: { status: 'synced' | 'saving' | 'error' | 'loading'
   };
   const { color, label } = map[status];
   return (
-    <div className="flex items-center gap-1.5 font-mono text-[length:var(--text-12)] text-muted-foreground select-none" title={label}>
-      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-      {label}
-    </div>
+    <span className="w-2 h-2 rounded-full flex-shrink-0 inline-block" style={{ backgroundColor: color }} title={label} />
   );
 }
 
