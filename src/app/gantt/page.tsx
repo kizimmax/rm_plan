@@ -810,20 +810,34 @@ export default function GanttPage() {
     setSummaryLoading(weekId);
     updateWeekTheme(weekId, 'Загрузка...');
 
-    const taskLines: string[] = [];
+    // Group rows into 4 semantic blocks
+    const blockMap: Record<string, string> = {
+      'согласование': 'Согласование',
+      'контент': 'Контент',
+      'ui-направление': 'Сайт', 'вайп код дизайн сайта': 'Сайт', 'design system': 'Сайт', 'вайп код верстка сайта': 'Сайт',
+      'mvp сервиса': 'Сервис', 'n8n интеграция': 'Сервис', 'продуктовые состояния': 'Сервис', 'qa аналитики': 'Сервис',
+    };
+    const blocks: Record<string, string[]> = {};
+    let totalCount = 0;
     rows.forEach(row => {
       const cards = row.cells[weekId] ?? [];
+      if (cards.length === 0) return;
+      const block = blockMap[row.label.toLowerCase().trim()] ?? row.label;
+      if (!blocks[block]) blocks[block] = [];
       cards.forEach(c => {
         const status = c.done ? '✅' : '⬜';
-        taskLines.push(`${status} [${row.label}] ${c.label.split('\n')[0]}`);
+        blocks[block].push(`${status} ${c.label.split('\n')[0]}`);
+        totalCount++;
       });
     });
 
-    if (taskLines.length === 0) {
+    if (totalCount === 0) {
       updateWeekTheme(weekId, 'Нет задач');
       setSummaryLoading(null);
       return;
     }
+
+    const blockText = Object.entries(blocks).map(([name, tasks]) => `[${name}]\n${tasks.join('\n')}`).join('\n\n');
 
     try {
       const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -834,10 +848,10 @@ export default function GanttPage() {
         },
         body: JSON.stringify({
           model: 'llama-3.1-8b-instant',
-          max_tokens: 120,
+          max_tokens: 150,
           messages: [
-            { role: 'system', content: 'Ты — помощник проджект-менеджера. Отвечай строго одной строкой на русском. Без цифр в начале, без нумерации.' },
-            { role: 'user', content: `Задачи недели "${week.label}" (${week.dates}):\n\n${taskLines.join('\n')}\n\nСформулируй итог недели ОДНОЙ строкой до 80 символов. Правила:\n- НЕ начинай с цифр или счётчиков\n- НЕ используй общие слова: «работа над», «согласование», «подготовка», «разработка»\n- Называй КОНКРЕТНЫЕ сущности: не «дизайн сайта» а «hero-секция + каталог услуг», не «согласование» а «утверждение структуры лендинга»\n- Пиши через запятую или «+» ключевые конкретные результаты недели\n- Пример хорошего: «hero-блок + сетка услуг + auth-экран»\n- Пример плохого: «работа над дизайном и вёрсткой сайта»` },
+            { role: 'system', content: 'Ты — помощник проджект-менеджера. Пиши кратко на русском.' },
+            { role: 'user', content: `Задачи недели "${week.label}" (${week.dates}) сгруппированы по блокам:\n\n${blockText}\n\nНапиши саммери из ТРЁХ коротких частей через « · » (точка по центру). Каждая часть — ключевой конкретный результат одного-двух блоков. Объедини смежные блоки по смыслу.\n\nПравила:\n- НЕ пиши названия блоков (Сайт, Сервис, Контент, Согласование)\n- НЕ начинай с цифр\n- НЕ используй общие слова: «работа над», «согласование», «подготовка», «разработка», «создание»\n- Называй конкретные сущности из задач: «hero + сетка услуг» вместо «дизайн сайта»\n- Каждая часть до 25 символов\n- Формат ответа: «часть1 · часть2 · часть3»\n- Пример: «hero + навигация · auth-флоу · тексты о компании»` },
           ],
         }),
       });
