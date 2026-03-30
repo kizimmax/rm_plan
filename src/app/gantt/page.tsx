@@ -828,7 +828,7 @@ export default function GanttPage() {
     const userPrompt = `Ты — помощник проджект-менеджера. Вот список задач на неделю "${week.label}" (${week.dates}):\n\n${taskLines.join('\n')}\n\nНапиши ОДНУ строку (до 80 символов) — краткий итог/фокус этой недели на русском. Не используй маркеры списка, не повторяй название недели. Только суть: что будет сделано или достигнуто. Формат: "N/M · краткий итог" где N — сделано, M — всего задач.`;
 
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
