@@ -1146,33 +1146,37 @@ export default function GanttPage() {
                     backgroundColor: dropTargetRowIdx === idx && draggingRowId && draggingRowId !== row.id
                       ? 'var(--muted)' : undefined,
                   }}
-                  draggable
-                  onDragStart={e => onRowDragStart(e, idx)}
-                  onDragOver={e => onRowDragOver(e, idx)}
-                  onDrop={e => onRowDrop(e, idx)}
-                  onDragEnd={onRowDragEnd}
+                  draggable={!isMobile}
+                  onDragStart={isMobile ? undefined : e => onRowDragStart(e, idx)}
+                  onDragOver={isMobile ? undefined : e => onRowDragOver(e, idx)}
+                  onDrop={isMobile ? undefined : e => onRowDrop(e, idx)}
+                  onDragEnd={isMobile ? undefined : onRowDragEnd}
                 >
                   {/* Left column */}
                   <div
                     className="flex-shrink-0 flex items-start gap-1 px-2 py-2 md:gap-2 md:px-3 md:py-3 border-r border-border bg-background"
                     style={isMobile ? { width: '30%', minWidth: 0 } : { width: COL_W, minWidth: COL_W }}
                   >
-                    <span
-                      className="cursor-grab text-muted-foreground/30 hover:text-muted-foreground transition-colors select-none flex-shrink-0 mt-0.5 text-[length:var(--text-16)] leading-none"
-                      title="Перетащить строку"
-                    >
-                      ⠿
-                    </span>
+                    {!isMobile && (
+                      <span
+                        className="cursor-grab text-muted-foreground/30 hover:text-muted-foreground transition-colors select-none flex-shrink-0 mt-0.5 text-[length:var(--text-16)] leading-none"
+                        title="Перетащить строку"
+                      >
+                        ⠿
+                      </span>
+                    )}
                     <span className="text-[length:var(--text-12)] font-medium text-foreground flex-1 min-w-0 mt-0.5">
                       <EditableText value={row.label} onChange={v => updateRowLabel(row.id, v)} />
                     </span>
-                    <button
-                      onClick={() => removeRow(row.id)}
-                      className="flex-shrink-0 text-muted-foreground/20 hover:text-destructive transition-colors text-[length:var(--text-14)] leading-none mt-0.5"
-                      title="Удалить строку"
-                    >
-                      ×
-                    </button>
+                    {!isMobile && (
+                      <button
+                        onClick={() => removeRow(row.id)}
+                        className="flex-shrink-0 text-muted-foreground/20 hover:text-destructive transition-colors text-[length:var(--text-14)] leading-none mt-0.5"
+                        title="Удалить строку"
+                      >
+                        ×
+                      </button>
+                    )}
                   </div>
 
                   {/* Week cells */}
