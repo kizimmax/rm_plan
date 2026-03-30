@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { ref, onValue, set } from 'firebase/database';
 import { db } from '@/lib/firebase';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type ColorToken = 'yellow' | 'violet' | 'sky' | 'terracotta' | 'pink' | 'blue' | 'red' | 'green';
+type ColorToken = 'yellow' | 'violet' | 'sky' | 'terracotta' | 'pink' | 'blue' | 'red' | 'green' | 'neutral';
 
 type Week = {
   id: string;
@@ -19,6 +19,18 @@ type Week = {
 // ─── Color helpers ────────────────────────────────────────────────────────────
 
 function cssVar(token: ColorToken, level: '100' | '300' | '500' | '700' | '900' | 'fg' | 'fg-subtle') {
+  if (token === 'neutral') {
+    const map: Record<string, string> = {
+      '100': 'var(--rm-gray-5)',
+      '300': 'var(--rm-gray-4)',
+      '500': 'var(--rm-gray-6)',
+      '700': 'var(--rm-gray-4)',
+      '900': 'var(--rm-gray-2)',
+      'fg':  'var(--rm-gray-fg)',
+      'fg-subtle': 'var(--rm-gray-6)',
+    };
+    return map[level];
+  }
   return `var(--rm-${token}-${level})`;
 }
 
@@ -38,17 +50,44 @@ type Row = {
   cells: Record<string, Card[]>; // weekId → список карточек
 };
 
-type PendingDelete =
-  | { type: 'card'; label: string; rowId: string; weekId: string; card: Card; index: number }
-  | { type: 'row'; label: string; row: Row; index: number };
+// ─── Date helpers ─────────────────────────────────────────────────────────────
+
+const PROJECT_START = new Date(2026, 2, 9); // 9 марта 2026 (понедельник)
+const VISIBLE_COUNT = 4;
+const MONTH_SHORT = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+const WEEK_COLORS: ColorToken[] = ['violet', 'sky', 'terracotta', 'yellow', 'pink', 'blue', 'red', 'green'];
+
+function getWeekRange(weekIndex: number): { start: Date; end: Date } {
+  const start = new Date(PROJECT_START);
+  start.setDate(start.getDate() + weekIndex * 7);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 6);
+  return { start, end };
+}
+
+function formatWeekDates(weekIndex: number): string {
+  const { start, end } = getWeekRange(weekIndex);
+  const sm = MONTH_SHORT[start.getMonth()];
+  const em = MONTH_SHORT[end.getMonth()];
+  if (sm === em) return `${start.getDate()}–${end.getDate()} ${sm}`;
+  return `${start.getDate()} ${sm} – ${end.getDate()} ${em}`;
+}
+
+function getCurrentWeekIndex(): number {
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const diffMs = now.getTime() - PROJECT_START.getTime();
+  if (diffMs < 0) return -1;
+  return Math.floor(diffMs / (1000 * 60 * 60 * 24 * 7));
+}
 
 // ─── Initial data ─────────────────────────────────────────────────────────────
 
 const INITIAL_WEEKS: Week[] = [
-  { id: 'w1', label: 'Неделя 1', dates: '9–15 мар', theme: 'Поиск направления + технический фундамент + DS v1', color: 'violet' },
-  { id: 'w2', label: 'Неделя 2', dates: '16–22 мар', theme: 'Стабилизация сборки + DS v2 + старт MVP сервиса', color: 'sky' },
-  { id: 'w3', label: 'Неделя 3', dates: '23–29 мар', theme: 'Интеграция MVP с n8n + агенты + DS v3', color: 'terracotta' },
-  { id: 'w4', label: 'Неделя 4', dates: '30 мар – 5 апр', theme: 'Полировка + DS v4 + QA MVP сервиса', color: 'yellow' },
+  { id: 'w1', label: 'Неделя 1', dates: formatWeekDates(0), theme: 'Поиск направления + технический фундамент + DS v1', color: 'violet' },
+  { id: 'w2', label: 'Неделя 2', dates: formatWeekDates(1), theme: 'Стабилизация сборки + DS v2 + старт MVP сервиса', color: 'sky' },
+  { id: 'w3', label: 'Неделя 3', dates: formatWeekDates(2), theme: 'Интеграция MVP с n8n + агенты + DS v3', color: 'terracotta' },
+  { id: 'w4', label: 'Неделя 4', dates: formatWeekDates(3), theme: 'Полировка + DS v4 + QA MVP сервиса', color: 'yellow' },
 ];
 
 function card(label: string, done = false): Card {
@@ -232,13 +271,13 @@ function CardItem({
       onDragEnd={onDragEnd}
       onDragOver={onDragOver}
       onDrop={onDrop}
-      className="rounded-md px-2.5 pt-1.5 pb-2 group/card relative transition-colors"
+      className="rounded-lg px-2.5 pt-1.5 pb-2 group/card relative transition-colors duration-300"
       style={{
         backgroundColor: c.done
-          ? `color-mix(in srgb, ${cssVar(weekColor, '900')}, transparent 55%)`
+          ? `color-mix(in srgb, ${cssVar(weekColor, '900')}, transparent 40%)`
           : cssVar(weekColor, '900'),
         border: `1px solid ${c.done
-          ? `color-mix(in srgb, ${cssVar(weekColor, '300')}, transparent 80%)`
+          ? `color-mix(in srgb, ${cssVar(weekColor, '300')}, transparent 60%)`
           : cssVar(weekColor, '300')}`,
         cursor: editing ? 'default' : 'grab',
       }}
@@ -255,13 +294,13 @@ function CardItem({
           title={c.done ? 'Готово' : 'Отметить как готово'}
         >
           {c.done && (
-            <svg viewBox="0 0 10 10" className="w-full h-full" fill="none">
-              <path d="M2 5l2.5 2.5L8 3" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <svg viewBox="0 0 10 10" className="w-full h-full text-white" fill="none">
+              <path d="M2 5l2.5 2.5L8 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           )}
         </button>
 
-        <div className="flex-1 grid grid-cols-5 gap-0.5">
+        <div className="flex-1 grid grid-cols-5 gap-1">
           {DAYS.map(day => {
             const active = (c.days ?? []).includes(day);
             return (
@@ -275,7 +314,7 @@ function CardItem({
                   borderRadius: 3,
                   backgroundColor: active ? cssVar(weekColor, '100') : cssVar(weekColor, '900'),
                   color: active ? cssVar(weekColor, 'fg') : cssVar(weekColor, 'fg-subtle'),
-                  opacity: active ? (c.done ? 0.45 : 1) : (c.done ? 0.25 : 0.6),
+                  opacity: active ? 1 : 0.6,
                   border: `1px solid ${active ? cssVar(weekColor, '100') : cssVar(weekColor, '300')}`,
                 }}
                 title={day}
@@ -288,7 +327,7 @@ function CardItem({
         {!locked && (
           <button
             onClick={onRemove}
-            className="opacity-0 group-hover/card:opacity-100 transition-opacity text-muted-foreground/40 hover:text-destructive text-sm leading-none"
+            className="opacity-0 group-hover/card:opacity-100 transition-opacity text-muted-foreground/40 hover:text-destructive text-[length:var(--text-14)] leading-none"
             title="Удалить карточку"
           >
             ×
@@ -300,7 +339,7 @@ function CardItem({
         <textarea
           ref={taRef}
           defaultValue={c.label}
-          className="w-full bg-transparent outline-none resize-none text-xs leading-snug"
+          className="w-full bg-transparent outline-none resize-none text-[length:var(--text-12)] leading-snug"
           style={{ color: cssVar(weekColor, 'fg-subtle'), minHeight: 32 }}
           rows={Math.max(lines.length, 1)}
           onInput={e => autoResize(e.currentTarget)}
@@ -320,7 +359,7 @@ function CardItem({
           title={locked ? undefined : 'Двойной клик — редактировать'}
         >
           {(lines.length > 0 ? lines : [c.label]).map((line, i) => (
-            <li key={i} className="flex items-start gap-1.5 text-xs leading-snug">
+            <li key={i} className="flex items-start gap-1.5 text-[length:var(--text-12)] leading-snug">
               <span className="flex-shrink-0 mt-[3px] w-1 h-1 rounded-full" style={{ backgroundColor: cssVar(weekColor, '100'), opacity: 0.7 }} />
               <span style={{ color: cssVar(weekColor, 'fg-subtle') }}>{line}</span>
             </li>
@@ -350,7 +389,7 @@ function LockModal({ onClose, onUnlock }: { onClose: () => void; onUnlock: () =>
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ backgroundColor: 'rgba(0,0,0,0.45)' }}
+      style={{ backgroundColor: 'var(--rm-gray-alpha-600)' }}
       onClick={onClose}
     >
       <div
@@ -358,9 +397,9 @@ function LockModal({ onClose, onUnlock }: { onClose: () => void; onUnlock: () =>
         onClick={e => e.stopPropagation()}
       >
         <div className="text-center mb-4">
-          <div className="text-2xl mb-1">🔒</div>
-          <div className="font-heading font-bold text-base">Введите пароль</div>
-          <div className="text-xs text-muted-foreground mt-0.5">для разблокировки редактирования</div>
+          <div className="text-[length:var(--text-25)] mb-1">🔒</div>
+          <div className="font-heading font-bold text-[length:var(--text-16)]">Введите пароль</div>
+          <div className="text-[length:var(--text-12)] text-muted-foreground mt-0.5">для разблокировки редактирования</div>
         </div>
         <input
           ref={inputRef}
@@ -368,25 +407,25 @@ function LockModal({ onClose, onUnlock }: { onClose: () => void; onUnlock: () =>
           value={val}
           onChange={e => setVal(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') submit(); if (e.key === 'Escape') onClose(); }}
-          className="w-full border rounded-lg px-3 py-2 text-sm outline-none transition-colors"
+          className="w-full border rounded-lg px-3 py-2 text-[length:var(--text-14)] outline-none transition-colors"
           style={{
-            borderColor: err ? '#ED4843' : 'var(--border)',
-            backgroundColor: err ? '#FFF9F8' : 'var(--background)',
+            borderColor: err ? 'var(--rm-red-100)' : 'var(--border)',
+            backgroundColor: err ? 'var(--rm-red-900)' : 'var(--background)',
           }}
           placeholder="Пароль"
           autoComplete="off"
         />
-        {err && <p className="text-xs text-red-500 mt-1.5">Неверный пароль</p>}
+        {err && <p className="text-[length:var(--text-12)] text-[var(--rm-red-100)] mt-1.5">Неверный пароль</p>}
         <div className="flex gap-2 mt-4">
           <button
             onClick={onClose}
-            className="flex-1 border border-border rounded-lg py-2 text-sm hover:bg-muted transition-colors"
+            className="flex-1 border border-border rounded-lg py-2 text-[length:var(--text-14)] hover:bg-muted transition-colors"
           >
             Отмена
           </button>
           <button
             onClick={submit}
-            className="flex-1 rounded-lg py-2 text-sm font-medium transition-colors"
+            className="flex-1 rounded-lg py-2 text-[length:var(--text-14)] font-medium transition-colors"
             style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
           >
             Войти
@@ -397,147 +436,88 @@ function LockModal({ onClose, onUnlock }: { onClose: () => void; onUnlock: () =>
   );
 }
 
+// ─── Summary modal ────────────────────────────────────────────────────────────
+
+function SummaryModal({ weekLabel, text, onClose }: { weekLabel: string; text: string; onClose: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ backgroundColor: 'var(--rm-gray-alpha-600)' }}
+      onClick={onClose}
+    >
+      <div
+        className="bg-background border border-border rounded-2xl p-6 w-[480px] max-h-[80vh] shadow-lg flex flex-col"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <div className="font-heading font-bold text-[length:var(--text-16)]">Итог: {weekLabel}</div>
+          <button
+            onClick={onClose}
+            className="text-muted-foreground hover:text-foreground transition-colors text-[length:var(--text-16)] leading-none"
+          >
+            &times;
+          </button>
+        </div>
+        <div className="overflow-y-auto">
+          <pre className="whitespace-pre-wrap font-body text-[length:var(--text-12)] text-muted-foreground leading-relaxed">
+            {text}
+          </pre>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Sync indicator ───────────────────────────────────────────────────────────
 
 function SyncDot({ status }: { status: 'synced' | 'saving' | 'error' | 'loading' }) {
   const map = {
-    loading: { color: '#94a3b8', label: 'Загрузка…' },
-    saving:  { color: '#F59E0B', label: 'Сохранение…' },
-    synced:  { color: '#22C55E', label: 'Синхронизировано' },
-    error:   { color: '#EF4444', label: 'Ошибка синхронизации' },
+    loading: { color: 'var(--rm-gray-4)', label: 'Загрузка…' },
+    saving:  { color: 'var(--rm-yellow-100)', label: 'Сохранение…' },
+    synced:  { color: 'var(--rm-green-100)', label: 'Синхронизировано' },
+    error:   { color: 'var(--rm-red-100)', label: 'Ошибка синхронизации' },
   };
   const { color, label } = map[status];
   return (
-    <div className="flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground select-none" title={label}>
+    <div className="flex items-center gap-1.5 font-mono text-[length:var(--text-12)] text-muted-foreground select-none" title={label}>
       <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
       {label}
     </div>
   );
 }
 
-// ─── Undo toast (bottom-right) ────────────────────────────────────────────────
+// ─── SVG Icons ────────────────────────────────────────────────────────────────
 
-function UndoToast({
-  pending, timeLeft, onUndo, onDismiss,
-}: {
-  pending: PendingDelete; timeLeft: number; onUndo: () => void; onDismiss: () => void;
-}) {
-  const firstLine = pending.label.split('\n')[0].slice(0, 38);
-  const caption = pending.type === 'card' ? `«${firstLine}»` : `строка «${firstLine}»`;
-  const pct = (timeLeft / 10) * 100;
+function ChevronLeftIcon({ className }: { className?: string }) {
   return (
-    <div
-      className="fixed bottom-6 right-6 z-50 w-72 rounded-xl border border-border bg-background overflow-hidden"
-      style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.14)' }}
-    >
-      {/* countdown bar */}
-      <div className="h-[3px] bg-border">
-        <div
-          className="h-full transition-all duration-1000 ease-linear"
-          style={{ width: `${pct}%`, backgroundColor: 'var(--primary)' }}
-        />
-      </div>
-      <div className="px-4 py-3">
-        <div className="flex items-start gap-2">
-          <div className="flex-1 min-w-0">
-            <div className="text-[12px] font-medium text-foreground leading-snug truncate">{caption}</div>
-            <div className="text-[11px] text-muted-foreground mt-0.5 font-mono">удалена · {timeLeft}с до подтверждения</div>
-          </div>
-          <button
-            onClick={onDismiss}
-            className="flex-shrink-0 w-5 h-5 flex items-center justify-center rounded text-muted-foreground/40 hover:text-muted-foreground transition-colors text-lg leading-none"
-            title="Закрыть"
-          >×</button>
-        </div>
-        <button
-          onClick={onUndo}
-          className="mt-2.5 w-full rounded-lg py-1.5 text-xs font-medium border border-border hover:bg-muted transition-colors"
-        >
-          Отменить удаление
-        </button>
-      </div>
-    </div>
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M10 12L6 8l4-4" />
+    </svg>
   );
 }
 
-// ─── Top mini notice ───────────────────────────────────────────────────────────
-
-function TopNotice({ message }: { message: string }) {
+function ChevronRightIcon({ className }: { className?: string }) {
   return (
-    <div
-      className="fixed top-4 left-1/2 z-50 -translate-x-1/2 px-4 py-1.5 rounded-full border border-border bg-background text-[11px] text-muted-foreground font-mono select-none pointer-events-none whitespace-nowrap"
-      style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.08)' }}
-    >
-      {message}
-    </div>
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M6 4l4 4-4 4" />
+    </svg>
+  );
+}
+
+function RefreshIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M13.5 2.5v4h-4" />
+      <path d="M2.5 13.5v-4h4" />
+      <path d="M13.16 6A5.5 5.5 0 004.2 4.2L2.5 6.5" />
+      <path d="M2.84 10a5.5 5.5 0 008.96 1.8l1.7-2.3" />
+    </svg>
   );
 }
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 const DB_PATH = 'gantt';
-
-// ─── Migrate legacy hex colors → ColorToken names ─────────────────────────────
-const HEX_TO_TOKEN: Record<string, ColorToken> = {
-  '#a172f8': 'violet', '#56caea': 'sky', '#fe733a': 'terracotta', '#ffcc00': 'yellow',
-  '#c4a0fb': 'violet', '#8adcf2': 'sky', '#ffa07a': 'terracotta', '#ffe066': 'yellow',
-  '#f472b6': 'pink',   '#3b82f6': 'blue', '#ef4444': 'red',       '#22c55e': 'green',
-};
-const VALID_TOKENS = new Set<ColorToken>(['yellow','violet','sky','terracotta','pink','blue','red','green']);
-
-function migrateColor(c: unknown): ColorToken {
-  if (typeof c === 'string') {
-    const lower = c.toLowerCase();
-    if (VALID_TOKENS.has(lower as ColorToken)) return lower as ColorToken;
-    if (HEX_TO_TOKEN[lower]) return HEX_TO_TOKEN[lower];
-  }
-  return 'violet';
-}
-
-// Firebase drops empty arrays → come back as null/undefined.
-// Also, arrays may come back as objects with integer keys.
-function toArray<T>(raw: unknown): T[] {
-  if (!raw) return [];
-  if (Array.isArray(raw)) return raw as T[];
-  return Object.values(raw as Record<string, unknown>) as T[];
-}
-
-function normalizeCard(raw: unknown): Card {
-  const c = raw as Card;
-  const days = !c.days
-    ? []
-    : Array.isArray(c.days)
-    ? c.days
-    : (Object.values(c.days as Record<string, Day>) as Day[]);
-  return { ...c, days };
-}
-
-function normalizeRows(raw: unknown): Row[] {
-  return toArray<Row>(raw).filter(Boolean).map((rawRow: unknown) => {
-    const row = rawRow as Row;
-    const rawCells = row.cells as unknown;
-    const cells: Record<string, Card[]> = {};
-    if (rawCells && typeof rawCells === 'object') {
-      for (const [key, value] of Object.entries(rawCells as Record<string, unknown>)) {
-        if (!value) {
-          cells[key] = [];
-        } else if (Array.isArray(value)) {
-          cells[key] = value.map(normalizeCard);
-        } else {
-          cells[key] = Object.values(value as Record<string, unknown>).map(normalizeCard);
-        }
-      }
-    }
-    return { ...row, cells };
-  });
-}
-
-function normalizeWeeks(raw: unknown): Week[] {
-  return toArray<Week>(raw).filter(Boolean).map((w: unknown) => {
-    const week = w as Week;
-    return { ...week, color: migrateColor(week.color) };
-  });
-}
 
 export default function GanttPage() {
   const [weeks, setWeeks] = useState<Week[]>(INITIAL_WEEKS);
@@ -547,76 +527,47 @@ export default function GanttPage() {
   const [locked, setLocked] = useState(false);
   const [showLockModal, setShowLockModal] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'synced' | 'saving' | 'error' | 'loading'>('loading');
-  const [isMobile, setIsMobile] = useState(false);
-  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
-  const [deleteTimeLeft, setDeleteTimeLeft] = useState(10);
-  const [topNotice, setTopNotice] = useState<string | null>(null);
-  const topNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 768);
-    check();
-    window.addEventListener('resize', check);
-    return () => window.removeEventListener('resize', check);
-  }, []);
+  // Week navigation
+  const [visibleStartIdx, setVisibleStartIdx] = useState(0);
 
-  // ── Undo / delete toast logic ─────────────────────────────────────────────
-
-  const showTopNotice = useCallback((msg: string) => {
-    setTopNotice(msg);
-    if (topNoticeTimerRef.current) clearTimeout(topNoticeTimerRef.current);
-    topNoticeTimerRef.current = setTimeout(() => setTopNotice(null), 2500);
-  }, []);
-
-  useEffect(() => {
-    if (!pendingDelete) return;
-    if (deleteTimeLeft <= 0) {
-      const msg = pendingDelete.type === 'card' ? 'Задача удалена' : 'Строка удалена';
-      setPendingDelete(null);
-      showTopNotice(msg);
-      return;
-    }
-    const t = setTimeout(() => setDeleteTimeLeft(n => n - 1), 1000);
-    return () => clearTimeout(t);
-  }, [pendingDelete, deleteTimeLeft, showTopNotice]);
-
-  const startDeleteToast = useCallback((pending: PendingDelete) => {
-    setPendingDelete(prev => {
-      if (prev) showTopNotice(prev.type === 'card' ? 'Задача удалена' : 'Строка удалена');
-      return pending;
-    });
-    setDeleteTimeLeft(10);
-  }, [showTopNotice]);
-
-  const handleUndoDelete = () => {
-    if (!pendingDelete) return;
-    if (pendingDelete.type === 'card') {
-      const next = rows.map(r => {
-        if (r.id !== pendingDelete.rowId) return r;
-        const arr = [...((r.cells ?? {})[pendingDelete.weekId] ?? [])];
-        arr.splice(pendingDelete.index, 0, pendingDelete.card);
-        return { ...r, cells: { ...r.cells, [pendingDelete.weekId]: arr } };
-      });
-      updateRows(next);
-    } else {
-      const next = [...rows];
-      next.splice(pendingDelete.index, 0, pendingDelete.row);
-      updateRows(next);
-    }
-    setPendingDelete(null);
-  };
-
-  const handleDismissToast = () => {
-    if (!pendingDelete) return;
-    const msg = pendingDelete.type === 'card' ? 'Задача удалена' : 'Строка удалена';
-    setPendingDelete(null);
-    showTopNotice(msg);
-  };
+  // Summary popup
+  const [summaryPopup, setSummaryPopup] = useState<{ weekId: string; text: string; weekLabel: string } | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState<string | null>(null);
 
   // Track whether we've received the first snapshot from Firebase
   const initialized = useRef(false);
   // Suppress writes while receiving remote update
   const remoteUpdate = useRef(false);
+  // Track initial scroll
+  const didInitialScroll = useRef(false);
+
+  // ── Current week index ─────────────────────────────────────────────────────
+  const currentWeekIdx = useMemo(() => getCurrentWeekIndex(), []);
+
+  // ── Visible weeks ──────────────────────────────────────────────────────────
+  const visibleWeeks = useMemo(() => {
+    return weeks.slice(visibleStartIdx, visibleStartIdx + VISIBLE_COUNT);
+  }, [weeks, visibleStartIdx]);
+
+  const canGoBack = visibleStartIdx > 0;
+  const canGoForward = visibleStartIdx + VISIBLE_COUNT < weeks.length;
+
+  // Effective color: current week = yellow, others = neutral
+  const getEffectiveColor = useCallback((globalIdx: number): ColorToken => {
+    return globalIdx === currentWeekIdx ? 'yellow' : 'neutral';
+  }, [currentWeekIdx]);
+
+  // ── Auto-scroll to current week on first data load ─────────────────────────
+  useEffect(() => {
+    if (!didInitialScroll.current && weeks.length > 0) {
+      didInitialScroll.current = true;
+      if (currentWeekIdx >= 0 && currentWeekIdx < weeks.length) {
+        const target = Math.max(0, Math.min(currentWeekIdx - 1, weeks.length - VISIBLE_COUNT));
+        setVisibleStartIdx(target);
+      }
+    }
+  }, [weeks.length, currentWeekIdx]);
 
   // ── Subscribe to Firebase Realtime DB ─────────────────────────────────────
   useEffect(() => {
@@ -627,8 +578,8 @@ export default function GanttPage() {
         const data = snapshot.val();
         remoteUpdate.current = true;
         if (data) {
-          if (data.weeks) setWeeks(normalizeWeeks(data.weeks));
-          if (data.rows) setRows(normalizeRows(data.rows));
+          if (data.weeks) setWeeks(data.weeks);
+          if (data.rows) setRows(data.rows);
           if (data.title) setTitle(data.title);
           if (data.subtitle) setSubtitle(data.subtitle);
           if (data.locked !== undefined) setLocked(data.locked);
@@ -784,17 +735,12 @@ export default function GanttPage() {
   };
 
   const removeCard = (rowId: string, weekId: string, cardId: string) => {
-    const srcRow = rows.find(r => r.id === rowId);
-    const srcCards = (srcRow?.cells ?? {})[weekId] ?? [];
-    const index = srcCards.findIndex(c => c.id === cardId);
-    const cardData = index >= 0 ? srcCards[index] : null;
     const next = rows.map(r =>
       r.id === rowId
-        ? { ...r, cells: { ...r.cells, [weekId]: srcCards.filter(c => c.id !== cardId) } }
+        ? { ...r, cells: { ...r.cells, [weekId]: (r.cells[weekId] ?? []).filter(c => c.id !== cardId) } }
         : r
     );
     updateRows(next);
-    if (cardData) startDeleteToast({ type: 'card', label: cardData.label, rowId, weekId, card: cardData, index });
   };
 
   const updateCardLabel = (rowId: string, weekId: string, cardId: string, val: string) => {
@@ -848,154 +794,248 @@ export default function GanttPage() {
     updateRows([...rows, { id, label: 'Новый раздел', cells }]);
   };
 
-  const removeRow = (rowId: string) => {
-    const index = rows.findIndex(r => r.id === rowId);
-    const rowData = index >= 0 ? rows[index] : null;
-    updateRows(rows.filter(r => r.id !== rowId));
-    if (rowData) startDeleteToast({ type: 'row', label: rowData.label, row: rowData, index });
+  const removeRow = (rowId: string) => updateRows(rows.filter(r => r.id !== rowId));
+
+  // ── Add week ──────────────────────────────────────────────────────────────
+
+  const addWeek = () => {
+    const idx = weeks.length;
+    const newId = `w${idx + 1}`;
+    const newWeek: Week = {
+      id: newId,
+      label: `Неделя ${idx + 1}`,
+      dates: formatWeekDates(idx),
+      theme: '',
+      color: WEEK_COLORS[idx % WEEK_COLORS.length],
+    };
+    const nextWeeks = [...weeks, newWeek];
+    const nextRows = rows.map(r => ({
+      ...r,
+      cells: { ...r.cells, [newId]: [] },
+    }));
+    setWeeks(nextWeeks);
+    setRows(nextRows);
+    persist(nextWeeks, nextRows, title, subtitle, locked);
+    // Navigate to show the new week
+    setVisibleStartIdx(Math.max(0, idx + 1 - VISIBLE_COUNT));
+  };
+
+  // ── Generate week summary ─────────────────────────────────────────────────
+
+  const generateWeekSummary = (weekId: string) => {
+    const weekIdx = weeks.findIndex(w => w.id === weekId);
+    const week = weeks[weekIdx];
+    if (!week) return;
+
+    setSummaryLoading(weekId);
+
+    // Collect all cards for this week
+    const sections: { name: string; total: number; done: number; tasks: { label: string; done: boolean }[] }[] = [];
+    rows.forEach(row => {
+      const cards = row.cells[weekId] ?? [];
+      if (cards.length > 0) {
+        sections.push({
+          name: row.label,
+          total: cards.length,
+          done: cards.filter(c => c.done).length,
+          tasks: cards.map(c => ({ label: c.label.split('\n')[0], done: c.done })),
+        });
+      }
+    });
+
+    const totalTasks = sections.reduce((s, sec) => s + sec.total, 0);
+    const doneTasks = sections.reduce((s, sec) => s + sec.done, 0);
+    const pct = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
+
+    let text = '';
+
+    if (totalTasks === 0) {
+      text = 'На эту неделю пока нет задач.';
+    } else {
+      text += `Прогресс: ${doneTasks} из ${totalTasks} (${pct}%)\n\n`;
+
+      const activeAreas = sections.map(s => s.name);
+      text += `Направления: ${activeAreas.join(', ')}\n\n`;
+
+      sections.forEach(s => {
+        const status = s.done === s.total ? 'Готово' : `${s.done}/${s.total}`;
+        text += `${s.name} [${status}]:\n`;
+        s.tasks.forEach(t => {
+          text += `  ${t.done ? '[x]' : '[ ]'} ${t.label}\n`;
+        });
+        text += '\n';
+      });
+
+      if (pct === 100) {
+        text += 'Все задачи выполнены.';
+      } else if (pct >= 75) {
+        text += `Неделя почти завершена. Осталось ${totalTasks - doneTasks} задач(и).`;
+      } else if (pct >= 50) {
+        text += `Прогресс на середине. ${totalTasks - doneTasks} задач(и) в работе.`;
+      } else {
+        text += `В начале пути. ${totalTasks - doneTasks} задач(и) впереди.`;
+      }
+    }
+
+    // Simulate brief processing delay for UX feedback
+    setTimeout(() => {
+      setSummaryPopup({ weekId, text, weekLabel: `${week.label} · ${week.dates}` });
+      setSummaryLoading(null);
+    }, 300);
   };
 
   // ──────────────────────────────────────────────────────────────────────────
 
-  const COL_W = 220;
+  const COL_W = 154;
 
   return (
     <div className="min-h-screen bg-background text-foreground font-body">
 
       {/* Header */}
-      <div className="border-b border-border px-4 md:px-8 py-4 md:py-6">
+      <div className="border-b border-border px-8 py-6">
         <div className="max-w-[1400px] mx-auto">
           <div className="flex items-center gap-3 mb-1">
-            <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground flex-1">
+            <p className="font-mono text-[length:var(--text-12)] uppercase tracking-[0.12em] text-muted-foreground flex-1">
               Rocketmind · MVP 1.1
             </p>
             <SyncDot status={syncStatus} />
           </div>
-          <h1 className="font-heading text-[1.5rem] md:text-[2rem] font-bold leading-tight">
+          <h1 className="font-heading text-[length:var(--text-31)] font-bold leading-tight">
             <EditableText value={title} onChange={updateTitle} />
           </h1>
-          <p className="text-muted-foreground mt-1.5 text-sm">
+          <p className="text-muted-foreground mt-1.5 text-[length:var(--text-14)]">
             <EditableText value={subtitle} onChange={updateSubtitle} />
           </p>
         </div>
       </div>
 
-      <div className="max-w-[1400px] mx-auto px-4 md:px-8 py-5 md:py-8 space-y-4 md:space-y-6">
+      <div className="max-w-[1400px] mx-auto px-8 py-8 space-y-6">
 
-        {/* Week cards */}
-        <div className="grid gap-3" style={{ gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : `repeat(${weeks.length}, 1fr)` }}>
-          {weeks.map(w => (
-            <div key={w.id} className="border border-border rounded-xl p-4 relative overflow-hidden">
-              <div className="absolute top-0 left-0 right-0 h-0.5" style={{ backgroundColor: cssVar(w.color, '100') }} />
-              <div className="font-mono text-[12px] uppercase tracking-[0.12em] text-muted-foreground mb-1">
-                <EditableText value={w.dates} onChange={v => updateWeekDates(w.id, v)} />
-              </div>
-              <div className="font-heading font-bold text-base mb-1">
-                <EditableText value={w.label} onChange={v => updateWeekLabel(w.id, v)} />
-              </div>
-              <p className="text-xs text-muted-foreground leading-snug">
-                <EditableText value={w.theme} onChange={v => updateWeekTheme(w.id, v)} />
-              </p>
-            </div>
-          ))}
+        {/* Week navigation */}
+        <div className="flex items-center gap-2">
+          <span className="text-[length:var(--text-12)] text-muted-foreground font-mono mr-auto">
+            Недели {visibleStartIdx + 1}–{Math.min(visibleStartIdx + VISIBLE_COUNT, weeks.length)} из {weeks.length}
+          </span>
+          <button
+            onClick={() => setVisibleStartIdx(i => Math.max(0, i - 1))}
+            disabled={!canGoBack}
+            className="w-8 h-8 flex items-center justify-center rounded-lg border border-border transition-colors hover:bg-muted disabled:opacity-25 disabled:pointer-events-none"
+            title="Предыдущая неделя"
+          >
+            <ChevronLeftIcon className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setVisibleStartIdx(i => Math.min(weeks.length - VISIBLE_COUNT, i + 1))}
+            disabled={!canGoForward}
+            className="w-8 h-8 flex items-center justify-center rounded-lg border border-border transition-colors hover:bg-muted disabled:opacity-25 disabled:pointer-events-none"
+            title="Следующая неделя"
+          >
+            <ChevronRightIcon className="w-4 h-4" />
+          </button>
+          {!locked && (
+            <button
+              onClick={addWeek}
+              className="h-8 px-3 flex items-center gap-1 rounded-lg border border-border text-[length:var(--text-12)] font-mono transition-colors hover:bg-muted"
+              title="Добавить неделю"
+            >
+              + неделя
+            </button>
+          )}
         </div>
 
-        {/* Mobile gantt — per-week stacked */}
-        {isMobile && (
-          <div className="space-y-3">
-            {weeks.map(w => (
-              <div key={w.id} className="border border-border rounded-xl overflow-hidden">
-                {/* Week header */}
-                <div className="px-4 py-3 bg-muted/20 border-b border-border relative">
-                  <div className="absolute top-0 left-0 right-0 h-0.5" style={{ backgroundColor: cssVar(w.color, '100') }} />
-                  <div className="font-mono text-[11px] font-bold uppercase tracking-widest pt-0.5" style={{ color: cssVar(w.color, '100') }}>
-                    {w.label} · {w.dates}
-                  </div>
-                  <div className="text-xs text-muted-foreground mt-0.5 leading-snug">{w.theme}</div>
+        {/* Week cards */}
+        <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${visibleWeeks.length}, 1fr)` }}>
+          {visibleWeeks.map((w, localIdx) => {
+            const globalIdx = visibleStartIdx + localIdx;
+            const isCurrent = globalIdx === currentWeekIdx;
+            const effColor = getEffectiveColor(globalIdx);
+            return (
+              <div
+                key={w.id}
+                className="border rounded-xl p-4 relative overflow-hidden transition-colors"
+                style={{
+                  borderColor: isCurrent ? cssVar('yellow', '300') : 'var(--border)',
+                  backgroundColor: isCurrent ? cssVar('yellow', '900') : undefined,
+                }}
+              >
+                <div
+                  className="absolute top-0 left-0 right-0"
+                  style={{
+                    height: isCurrent ? 3 : 1,
+                    backgroundColor: cssVar(effColor, '100'),
+                  }}
+                />
+                <div className="font-mono text-[length:var(--text-12)] uppercase tracking-[0.12em] mb-1" style={{ color: cssVar(effColor, isCurrent ? '100' : 'fg-subtle') }}>
+                  <EditableText value={w.dates} onChange={v => updateWeekDates(w.id, v)} />
                 </div>
-                {/* Rows for this week */}
-                {rows.map(row => {
-                  const cards = (row.cells ?? {})[w.id] ?? [];
-                  if (locked && cards.length === 0) return null;
-                  return (
-                    <div key={row.id} className="px-3 py-3 border-b border-border/40 last:border-b-0">
-                      <div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-2">
-                        {row.label}
-                      </div>
-                      {!locked && (
-                        <button
-                          onClick={() => addCard(row.id, w.id)}
-                          className="w-full mb-2 flex items-center justify-center gap-1 rounded text-[11px] font-mono uppercase tracking-wide transition-colors"
-                          style={{
-                            height: 24,
-                            color: cssVar(w.color, 'fg-subtle'),
-                            opacity: 0.45,
-                            backgroundColor: cssVar(w.color, '900'),
-                            border: `1px dashed ${cssVar(w.color, '300')}`,
-                          }}
-                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '0.85'; }}
-                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '0.45'; }}
-                        >
-                          +
-                        </button>
-                      )}
-                      <div className="flex flex-col gap-1.5">
-                        {cards.map(c => (
-                          <CardItem
-                            key={c.id}
-                            card={c}
-                            weekColor={w.color}
-                            locked={locked}
-                            onToggleDone={() => toggleCardDone(row.id, w.id, c.id)}
-                            onUpdateLabel={v => updateCardLabel(row.id, w.id, c.id, v)}
-                            onRemove={() => removeCard(row.id, w.id, c.id)}
-                            draggable={false}
-                            onDragStart={() => {}}
-                            onDragEnd={() => {}}
-                            onDragOver={() => {}}
-                            onDrop={() => {}}
-                            onToggleDay={day => toggleCardDay(row.id, w.id, c.id, day)}
-                          />
-                        ))}
-                        {cards.length === 0 && (
-                          <div className="min-h-[24px]" />
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+                <div className="font-heading font-bold text-[length:var(--text-16)] mb-1" style={{ color: isCurrent ? cssVar('yellow', 'fg') : undefined }}>
+                  <EditableText value={w.label} onChange={v => updateWeekLabel(w.id, v)} />
+                </div>
+                <p className="text-[length:var(--text-12)] leading-snug" style={{ color: cssVar(effColor, 'fg-subtle') }}>
+                  <EditableText value={w.theme} onChange={v => updateWeekTheme(w.id, v)} />
+                </p>
+                {isCurrent && (
+                  <div
+                    className="absolute top-2 right-2 px-1.5 py-0.5 rounded text-[length:9px] font-mono uppercase tracking-wider"
+                    style={{
+                      backgroundColor: cssVar('yellow', '100'),
+                      color: cssVar('yellow', 'fg'),
+                    }}
+                  >
+                    сейчас
+                  </div>
+                )}
               </div>
-            ))}
-          </div>
-        )}
+            );
+          })}
+        </div>
 
-        {/* Desktop gantt table */}
-        {!isMobile && <div className="border border-border rounded-xl overflow-hidden">
+        {/* Gantt table */}
+        <div className="border border-border rounded-xl overflow-hidden">
           <div className="overflow-x-auto">
-            <div style={{ minWidth: COL_W + weeks.length * 240 }}>
+            <div style={{ minWidth: COL_W + visibleWeeks.length * 240 }}>
 
               {/* Header */}
               <div className="flex border-b border-border bg-muted/40 sticky top-0 z-10">
                 <div
-                  className="flex-shrink-0 px-4 py-3 border-r border-border text-xs font-mono uppercase tracking-wide text-muted-foreground bg-muted/40"
+                  className="flex-shrink-0 px-4 py-3 border-r border-border text-[length:var(--text-12)] font-mono uppercase tracking-wide text-muted-foreground bg-muted/40"
                   style={{ width: COL_W, minWidth: COL_W }}
                 >
                   Раздел
                 </div>
-                {weeks.map(w => (
-                  <div
-                    key={w.id}
-                    className="flex-1 px-3 py-3 border-r border-border last:border-r-0 text-center"
-                    style={{ minWidth: 240 }}
-                  >
-                    <div className="font-mono text-xs font-bold uppercase tracking-wide" style={{ color: cssVar(w.color, '100') }}>
-                      <EditableText value={w.label} onChange={v => updateWeekLabel(w.id, v)} />
+                {visibleWeeks.map((w, localIdx) => {
+                  const globalIdx = visibleStartIdx + localIdx;
+                  const isCurrent = globalIdx === currentWeekIdx;
+                  const effColor = getEffectiveColor(globalIdx);
+                  return (
+                    <div
+                      key={w.id}
+                      className="flex-1 px-3 py-3 border-r border-border last:border-r-0 text-center"
+                      style={{ minWidth: 240, backgroundColor: isCurrent ? `color-mix(in srgb, ${cssVar('yellow', '900')}, transparent 60%)` : undefined }}
+                    >
+                      <div className="flex items-center justify-center gap-1">
+                        <div className="font-mono text-[length:var(--text-12)] font-bold uppercase tracking-wide" style={{ color: cssVar(effColor, '100') }}>
+                          <EditableText value={w.label} onChange={v => updateWeekLabel(w.id, v)} />
+                        </div>
+                        <button
+                          onClick={() => generateWeekSummary(w.id)}
+                          disabled={summaryLoading === w.id}
+                          className="inline-flex items-center justify-center w-5 h-5 rounded transition-colors text-muted-foreground/40 hover:text-muted-foreground hover:bg-muted"
+                          title="Сгенерировать итог недели"
+                        >
+                          {summaryLoading === w.id ? (
+                            <span className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <RefreshIcon className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                      </div>
+                      <div className="font-mono text-[length:var(--text-12)] text-muted-foreground mt-0.5">
+                        <EditableText value={w.dates} onChange={v => updateWeekDates(w.id, v)} />
+                      </div>
                     </div>
-                    <div className="font-mono text-[12px] text-muted-foreground mt-0.5">
-                      <EditableText value={w.dates} onChange={v => updateWeekDates(w.id, v)} />
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Rows */}
@@ -1020,52 +1060,56 @@ export default function GanttPage() {
                     style={{ width: COL_W, minWidth: COL_W }}
                   >
                     <span
-                      className="cursor-grab text-muted-foreground/30 hover:text-muted-foreground transition-colors select-none flex-shrink-0 mt-0.5 text-base leading-none"
+                      className="cursor-grab text-muted-foreground/30 hover:text-muted-foreground transition-colors select-none flex-shrink-0 mt-0.5 text-[length:var(--text-16)] leading-none"
                       title="Перетащить строку"
                     >
                       ⠿
                     </span>
-                    <span className="text-xs font-medium text-foreground flex-1 min-w-0 mt-0.5">
+                    <span className="text-[length:var(--text-12)] font-medium text-foreground flex-1 min-w-0 mt-0.5">
                       <EditableText value={row.label} onChange={v => updateRowLabel(row.id, v)} />
                     </span>
-                    {!locked && (
-                      <button
-                        onClick={() => removeRow(row.id)}
-                        className="flex-shrink-0 text-muted-foreground/20 hover:text-destructive transition-colors text-sm leading-none mt-0.5"
-                        title="Удалить строку"
-                      >
-                        ×
-                      </button>
-                    )}
+                    <button
+                      onClick={() => removeRow(row.id)}
+                      className="flex-shrink-0 text-muted-foreground/20 hover:text-destructive transition-colors text-[length:var(--text-14)] leading-none mt-0.5"
+                      title="Удалить строку"
+                    >
+                      ×
+                    </button>
                   </div>
 
                   {/* Week cells */}
-                  {weeks.map(w => {
-                    const cards = (row.cells ?? {})[w.id] ?? [];
+                  {visibleWeeks.map((w, localIdx) => {
+                    const globalIdx = visibleStartIdx + localIdx;
+                    const isCurrent = globalIdx === currentWeekIdx;
+                    const effColor = getEffectiveColor(globalIdx);
+                    const cards = row.cells?.[w.id] ?? [];
                     return (
                       <div
                         key={w.id}
                         className="flex-1 px-2 py-2 border-r border-border/40 last:border-r-0"
-                        style={{ minWidth: 240 }}
+                        style={{
+                          minWidth: 240,
+                          backgroundColor: isCurrent ? `color-mix(in srgb, ${cssVar('yellow', '900')}, transparent 60%)` : undefined,
+                        }}
                         onDragOver={e => onCardDragOver(e, row.id, w.id, null)}
                         onDrop={e => onCardDrop(e, row.id, w.id, null)}
                       >
                         {!locked && (
                           <button
                             onClick={() => addCard(row.id, w.id)}
-                            className="w-full mb-1.5 flex items-center justify-center gap-1 rounded text-[12px] font-mono uppercase tracking-wide transition-colors"
+                            className="w-full mb-1.5 flex items-center justify-center gap-1 rounded text-[length:var(--text-12)] font-mono uppercase tracking-wide transition-colors"
                             style={{
                               height: 18,
-                              color: cssVar(w.color, 'fg-subtle'),
+                              color: cssVar(effColor, 'fg-subtle'),
                               opacity: 0.35,
-                              backgroundColor: cssVar(w.color, '900'),
-                              border: `1px dashed ${cssVar(w.color, '300')}`,
+                              backgroundColor: cssVar(effColor, '900'),
+                              border: `1px dashed ${cssVar(effColor, '300')}`,
                             }}
                             onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '0.8'; }}
                             onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '0.35'; }}
                             title="Добавить задачу"
                           >
-                            +
+                            + задача
                           </button>
                         )}
 
@@ -1079,12 +1123,12 @@ export default function GanttPage() {
                             return (
                               <div key={c.id}>
                                 {isDropBefore && (
-                                  <div className="h-0.5 mx-1 rounded-full mb-1" style={{ backgroundColor: cssVar(w.color, '100') }} />
+                                  <div className="h-0.5 mx-1 rounded-full mb-1" style={{ backgroundColor: cssVar(effColor, '100') }} />
                                 )}
                                 <div className="mb-1.5">
                                   <CardItem
                                     card={c}
-                                    weekColor={w.color}
+                                    weekColor={effColor}
                                     locked={locked}
                                     onToggleDone={() => toggleCardDone(row.id, w.id, c.id)}
                                     onUpdateLabel={v => updateCardLabel(row.id, w.id, c.id, v)}
@@ -1104,10 +1148,10 @@ export default function GanttPage() {
                             cardDropTarget?.weekId === w.id &&
                             cardDropTarget?.cardId === null &&
                             dragCard.current && (
-                            <div className="h-0.5 mx-1 rounded-full mb-1" style={{ backgroundColor: w.color }} />
+                            <div className="h-0.5 mx-1 rounded-full mb-1" style={{ backgroundColor: cssVar(effColor, '100') }} />
                           )}
                           {cards.length === 0 && (
-                            <div className="min-h-[40px] rounded-md border border-dashed border-border/0 hover:border-border/40 transition-colors" />
+                            <div className="min-h-[40px] rounded-sm border border-dashed border-border/0 hover:border-border/40 transition-colors" />
                           )}
                         </div>
                       </div>
@@ -1117,10 +1161,10 @@ export default function GanttPage() {
               ))}
             </div>
           </div>
-        </div>}
+        </div>
 
         {/* Bottom controls */}
-        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground font-mono pb-2">
+        <div className="flex items-center gap-4 text-[length:var(--text-12)] text-muted-foreground font-mono pb-2">
           {!locked && (
             <button
               onClick={addRow}
@@ -1129,30 +1173,25 @@ export default function GanttPage() {
               + строка
             </button>
           )}
-          {!isMobile && (
-            <div className="flex items-center gap-4 flex-1">
-              {!locked && (
-                <>
-                  <span>⠿ перетащить строку</span>
-                  <span>⬌ перетащить карточку</span>
-                  <span>двойной клик — редактировать</span>
-                </>
-              )}
-              {locked && <span className="text-muted-foreground/60">Редактирование заблокировано</span>}
-            </div>
-          )}
-          {isMobile && locked && (
-            <span className="text-muted-foreground/60 flex-1">Редактирование заблокировано</span>
-          )}
+          <div className="flex items-center gap-4 flex-1">
+            {!locked && (
+              <>
+                <span>⠿ перетащить строку</span>
+                <span>⬌ перетащить карточку</span>
+                <span>двойной клик — редактировать</span>
+              </>
+            )}
+            {locked && <span className="text-muted-foreground/60">Редактирование заблокировано</span>}
+          </div>
           <button
             onClick={() => {
               if (locked) { setShowLockModal(true); }
               else { updateLocked(true); }
             }}
-            className="flex-shrink-0 flex items-center gap-1.5 border border-border rounded-lg px-3 py-1.5 hover:bg-muted transition-colors text-foreground ml-auto"
+            className="flex-shrink-0 flex items-center gap-1.5 border border-border rounded-lg px-3 py-1.5 hover:bg-muted transition-colors text-foreground"
             title={locked ? 'Разблокировать' : 'Заблокировать редактирование'}
           >
-            <span className="text-sm">{locked ? '🔒' : '🔓'}</span>
+            <span className="text-[length:var(--text-14)]">{locked ? '🔒' : '🔓'}</span>
             <span>{locked ? 'Заблокировано' : 'Заблокировать'}</span>
           </button>
         </div>
@@ -1165,16 +1204,13 @@ export default function GanttPage() {
         />
       )}
 
-      {pendingDelete && (
-        <UndoToast
-          pending={pendingDelete}
-          timeLeft={deleteTimeLeft}
-          onUndo={handleUndoDelete}
-          onDismiss={handleDismissToast}
+      {summaryPopup && (
+        <SummaryModal
+          weekLabel={summaryPopup.weekLabel}
+          text={summaryPopup.text}
+          onClose={() => setSummaryPopup(null)}
         />
       )}
-
-      {topNotice && <TopNotice message={topNotice} />}
     </div>
   );
 }
