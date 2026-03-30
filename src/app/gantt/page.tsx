@@ -509,7 +509,6 @@ export default function GanttPage() {
   // API key input dialog
   const [showKeyInput, setShowKeyInput] = useState(false);
   const [pendingWeekId, setPendingWeekId] = useState<string | null>(null);
-  const keyInputRef = useRef<HTMLInputElement>(null);
 
   // Track whether we've received the first snapshot from Firebase
   const initialized = useRef(false);
@@ -802,9 +801,9 @@ export default function GanttPage() {
     setVisibleStartIdx(Math.max(0, idx + 1 - VISIBLE_COUNT));
   };
 
-  // ── Generate week summary (AI-powered via OpenAI) ────────────────────────
+  // ── Generate week summary (AI-powered via Anthropic Claude) ──────────────
 
-  const callOpenAI = async (weekId: string, apiKey: string) => {
+  const callAI = async (weekId: string, apiKey: string) => {
     const week = weeks.find(w => w.id === weekId);
     if (!week) return;
 
@@ -826,26 +825,30 @@ export default function GanttPage() {
     }
 
     try {
-      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
         },
         body: JSON.stringify({
-          model: 'gpt-4o-mini',
+          model: 'claude-haiku-4-5-20251001',
           max_tokens: 120,
-          messages: [
-            { role: 'system', content: 'Ты — помощник проджект-менеджера. Отвечай строго одной строкой на русском.' },
-            { role: 'user', content: `Вот список задач на неделю "${week.label}" (${week.dates}):\n\n${taskLines.join('\n')}\n\nНапиши ОДНУ строку (до 80 символов) — краткий итог/фокус этой недели. Не используй маркеры списка, не повторяй название недели. Только суть: что будет сделано или достигнуто. Формат: "N/M · краткий итог" где N — сделано, M — всего задач.` },
-          ],
+          messages: [{
+            role: 'user',
+            content: `Ты — помощник проджект-менеджера. Вот список задач на неделю "${week.label}" (${week.dates}):\n\n${taskLines.join('\n')}\n\nНапиши ОДНУ строку (до 80 символов) — краткий итог/фокус этой недели на русском. Не используй маркеры списка, не повторяй название недели. Только суть: что будет сделано или достигнуто. Формат: "N/M · краткий итог" где N — сделано, M — всего задач.`,
+          }],
         }),
       });
 
       if (!res.ok) {
-        if (res.status === 401 || res.status === 429) {
-          localStorage.removeItem('openai_api_key');
-          alert(res.status === 401 ? 'Неверный API ключ.' : 'Rate limit (429). Ключ сброшен.');
+        if (res.status === 401) {
+          localStorage.removeItem('anthropic_api_key');
+          setShowKeyInput(true);
+          setPendingWeekId(weekId);
+          alert('Неверный API ключ. Введите другой.');
         } else {
           alert('Ошибка API: ' + res.status);
         }
@@ -854,7 +857,7 @@ export default function GanttPage() {
       }
 
       const data = await res.json();
-      const text = data.choices?.[0]?.message?.content?.trim() ?? '';
+      const text = data.content?.[0]?.text?.trim() ?? '';
       if (text) updateWeekTheme(weekId, text);
     } catch (e) {
       console.error('AI summary error:', e);
@@ -864,24 +867,27 @@ export default function GanttPage() {
     }
   };
 
+  const [keyValue, setKeyValue] = useState('');
+
   const generateWeekSummary = (weekId: string) => {
-    const stored = localStorage.getItem('openai_api_key');
+    const stored = localStorage.getItem('anthropic_api_key');
     if (stored) {
-      callOpenAI(weekId, stored);
+      callAI(weekId, stored);
     } else {
       setPendingWeekId(weekId);
+      setKeyValue('');
       setShowKeyInput(true);
-      setTimeout(() => keyInputRef.current?.focus(), 50);
     }
   };
 
   const handleKeySubmit = () => {
-    const val = keyInputRef.current?.value?.trim();
+    const val = keyValue.trim();
     if (!val || !pendingWeekId) return;
-    localStorage.setItem('openai_api_key', val);
+    localStorage.setItem('anthropic_api_key', val);
     setShowKeyInput(false);
-    callOpenAI(pendingWeekId, val);
+    const wid = pendingWeekId;
     setPendingWeekId(null);
+    callAI(wid, val);
   };
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -895,12 +901,14 @@ export default function GanttPage() {
       {showKeyInput && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => { setShowKeyInput(false); setPendingWeekId(null); }}>
           <div className="bg-background border border-border rounded-lg p-6 shadow-xl max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
-            <p className="font-heading text-[length:var(--text-16)] font-bold mb-1">OpenAI API Key</p>
+            <p className="font-heading text-[length:var(--text-16)] font-bold mb-1">Anthropic API Key</p>
             <p className="text-muted-foreground text-[length:var(--text-12)] mb-4">Ключ сохранится в браузере</p>
             <input
-              ref={keyInputRef}
+              autoFocus
               type="password"
-              placeholder="sk-..."
+              placeholder="sk-ant-..."
+              value={keyValue}
+              onChange={e => setKeyValue(e.target.value)}
               className="w-full px-3 py-2 rounded border border-border bg-background text-foreground font-mono text-[length:var(--text-14)] mb-3 outline-none focus:border-muted-foreground"
               onKeyDown={e => { if (e.key === 'Enter') handleKeySubmit(); }}
             />
