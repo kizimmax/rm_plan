@@ -517,8 +517,11 @@ export default function GanttPage() {
   // Week navigation — start near current week to avoid flash
   const [visibleStartIdx, setVisibleStartIdx] = useState(() => {
     const cwIdx = getCurrentWeekIndex();
-    const maxStart = Math.max(0, INITIAL_WEEKS.length - VISIBLE_COUNT);
-    return cwIdx > 0 ? Math.min(Math.max(0, cwIdx - 1), maxStart) : 0;
+    const mobile = typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches;
+    const count = mobile ? 1 : VISIBLE_COUNT;
+    const maxStart = Math.max(0, INITIAL_WEEKS.length - count);
+    const ideal = mobile ? cwIdx : Math.max(0, cwIdx - 1);
+    return cwIdx > 0 ? Math.min(ideal, maxStart) : 0;
   });
 
   // Summary loading
@@ -539,7 +542,9 @@ export default function GanttPage() {
   const currentWeekIdx = useMemo(() => getCurrentWeekIndex(), []);
 
   // ── Mobile detection ─────────────────────────────────────────────────────
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches
+  );
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 768px)');
     setIsMobile(mq.matches);
@@ -571,11 +576,12 @@ export default function GanttPage() {
     setAnimating(true);
     if (slideTimerRef.current !== null) clearTimeout(slideTimerRef.current);
     slideTimerRef.current = window.setTimeout(() => {
-      setVisibleStartIdx(i => dir === 'left' ? Math.max(0, i - 1) : Math.min(weeks.length - VISIBLE_COUNT, i + 1));
+      const maxIdx = Math.max(0, weeks.length - effectiveCount);
+      setVisibleStartIdx(i => dir === 'left' ? Math.max(0, i - 1) : Math.min(maxIdx, i + 1));
       setSlideDir(null);
       setAnimating(false);
     }, 250);
-  }, [animating, canGoBack, canGoForward, weeks.length]);
+  }, [animating, canGoBack, canGoForward, weeks.length, effectiveCount]);
 
   // Effective color: current week = yellow, others = neutral
   const getEffectiveColor = useCallback((globalIdx: number): ColorToken => {
@@ -603,14 +609,14 @@ export default function GanttPage() {
           if (!didInitialScroll.current && data.weeks?.length > 0) {
             didInitialScroll.current = true;
             const wLen = data.weeks.length;
+            const mobile = window.matchMedia('(max-width: 768px)').matches;
+            const count = mobile ? 1 : VISIBLE_COUNT;
             if (currentWeekIdx >= 0 && currentWeekIdx < wLen) {
-              // Position so current week is visible with previous week for context
-              const maxStart = Math.max(0, wLen - VISIBLE_COUNT);
-              const ideal = Math.max(0, currentWeekIdx - 1);
+              const maxStart = Math.max(0, wLen - count);
+              const ideal = mobile ? currentWeekIdx : Math.max(0, currentWeekIdx - 1);
               setVisibleStartIdx(Math.min(ideal, maxStart));
-            } else if (wLen > VISIBLE_COUNT) {
-              // If current week is past the end, show last N weeks
-              setVisibleStartIdx(wLen - VISIBLE_COUNT);
+            } else if (wLen > count) {
+              setVisibleStartIdx(wLen - count);
             }
           }
         }
