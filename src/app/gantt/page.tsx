@@ -274,12 +274,13 @@ function CardItem({
       className="rounded-lg px-2.5 pt-1.5 pb-2 group/card relative transition-colors duration-300"
       style={{
         backgroundColor: c.done
-          ? `color-mix(in srgb, ${cssVar(weekColor, '900')}, transparent 40%)`
+          ? 'transparent'
           : cssVar(weekColor, '900'),
         border: `1px solid ${c.done
           ? `color-mix(in srgb, ${cssVar(weekColor, '300')}, transparent 60%)`
           : cssVar(weekColor, '300')}`,
         cursor: editing ? 'default' : 'grab',
+        opacity: c.done ? 0.45 : 1,
       }}
     >
       {/* Top row: checkbox + days + remove */}
@@ -340,7 +341,7 @@ function CardItem({
           ref={taRef}
           defaultValue={c.label}
           className="w-full bg-transparent outline-none resize-none text-[length:var(--text-12)] leading-snug"
-          style={{ color: cssVar(weekColor, 'fg-subtle'), minHeight: 32 }}
+          style={{ color: c.done ? cssVar(weekColor, 'fg-subtle') : cssVar(weekColor, 'fg'), minHeight: 32 }}
           rows={Math.max(lines.length, 1)}
           onInput={e => autoResize(e.currentTarget)}
           onBlur={e => {
@@ -360,8 +361,8 @@ function CardItem({
         >
           {(lines.length > 0 ? lines : [c.label]).map((line, i) => (
             <li key={i} className="flex items-start gap-1.5 text-[length:var(--text-12)] leading-snug">
-              <span className="flex-shrink-0 mt-[3px] w-1 h-1 rounded-full" style={{ backgroundColor: cssVar(weekColor, '100'), opacity: 0.7 }} />
-              <span style={{ color: cssVar(weekColor, 'fg-subtle') }}>{line}</span>
+              <span className="flex-shrink-0 mt-[3px] w-1 h-1 rounded-full" style={{ backgroundColor: cssVar(weekColor, '100'), opacity: c.done ? 0.4 : 0.7 }} />
+              <span style={{ color: c.done ? cssVar(weekColor, 'fg-subtle') : cssVar(weekColor, 'fg') }}>{line}</span>
             </li>
           ))}
         </ul>
