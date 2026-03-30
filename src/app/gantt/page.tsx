@@ -180,10 +180,11 @@ const INITIAL_SUBTITLE = '4 недели · Дизайн-система + MVP с
 // ─── EditableText ─────────────────────────────────────────────────────────────
 
 function EditableText({
-  value, onChange, className, style,
+  value, onChange, className, style, startEditing,
 }: {
   value: string; onChange: (v: string) => void;
   className?: string; style?: React.CSSProperties;
+  startEditing?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -192,6 +193,10 @@ function EditableText({
     setEditing(true);
     requestAnimationFrame(() => { ref.current?.focus(); ref.current?.select(); });
   }, []);
+
+  useEffect(() => {
+    if (startEditing) start();
+  }, [startEditing, start]);
 
   if (editing) {
     return (
@@ -506,6 +511,7 @@ export default function GanttPage() {
 
   // Summary loading
   const [summaryLoading, setSummaryLoading] = useState<string | null>(null);
+  const [summaryReady, setSummaryReady] = useState<string | null>(null);
   // API key input dialog
   const [showKeyInput, setShowKeyInput] = useState(false);
   const [pendingWeekId, setPendingWeekId] = useState<string | null>(null);
@@ -875,6 +881,7 @@ export default function GanttPage() {
       const data = await res.json();
       const text = data.choices?.[0]?.message?.content?.trim() ?? '';
       updateWeekTheme(weekId, text || 'Пустой ответ от AI');
+      setSummaryReady(weekId);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       updateWeekTheme(weekId, `Ошибка: ${msg}`);
@@ -1036,7 +1043,7 @@ export default function GanttPage() {
                       {/* Row 2: theme/summary + refresh */}
                       <div className="flex items-start gap-1 mt-1">
                         <p className="text-[length:var(--text-12)] leading-snug flex-1 min-w-0" style={{ color: cssVar(effColor, 'fg-subtle') }}>
-                          <EditableText value={w.theme} onChange={v => updateWeekTheme(w.id, v)} />
+                          <EditableText value={w.theme} onChange={v => { updateWeekTheme(w.id, v); setSummaryReady(null); }} startEditing={summaryReady === w.id} />
                         </p>
                         <button
                           onClick={() => generateWeekSummary(w.id)}
