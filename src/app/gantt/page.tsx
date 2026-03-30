@@ -808,6 +808,7 @@ export default function GanttPage() {
     if (!week) return;
 
     setSummaryLoading(weekId);
+    updateWeekTheme(weekId, 'Загрузка...');
 
     const taskLines: string[] = [];
     rows.forEach(row => {
@@ -824,26 +825,30 @@ export default function GanttPage() {
       return;
     }
 
-    const prompt = `Ты — помощник проджект-менеджера. Вот список задач на неделю "${week.label}" (${week.dates}):\n\n${taskLines.join('\n')}\n\nНапиши ОДНУ строку (до 80 символов) — краткий итог/фокус этой недели на русском. Не используй маркеры списка, не повторяй название недели. Только суть: что будет сделано или достигнуто. Формат: "N/M · краткий итог" где N — сделано, M — всего задач.`;
+    const userPrompt = `Ты — помощник проджект-менеджера. Вот список задач на неделю "${week.label}" (${week.dates}):\n\n${taskLines.join('\n')}\n\nНапиши ОДНУ строку (до 80 символов) — краткий итог/фокус этой недели на русском. Не используй маркеры списка, не повторяй название недели. Только суть: что будет сделано или достигнуто. Формат: "N/M · краткий итог" где N — сделано, M — всего задач.`;
 
     try {
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
+      const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
+          contents: [{ parts: [{ text: userPrompt }] }],
           generationConfig: { maxOutputTokens: 120 },
         }),
       });
 
       if (!res.ok) {
+        const errBody = await res.text().catch(() => '');
         if (res.status === 400 || res.status === 403) {
           localStorage.removeItem('gemini_api_key');
-          setShowKeyInput(true);
+          updateWeekTheme(weekId, `Ошибка ${res.status}: неверный ключ`);
           setPendingWeekId(weekId);
-          alert('Неверный API ключ. Введите другой.');
+          setKeyValue('');
+          setShowKeyInput(true);
         } else {
-          alert('Ошибка API: ' + res.status);
+          updateWeekTheme(weekId, `Ошибка API: ${res.status}`);
+          console.error('Gemini error:', errBody);
         }
         setSummaryLoading(null);
         return;
@@ -851,10 +856,11 @@ export default function GanttPage() {
 
       const data = await res.json();
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? '';
-      if (text) updateWeekTheme(weekId, text);
-    } catch (e) {
+      updateWeekTheme(weekId, text || 'Пустой ответ от AI');
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      updateWeekTheme(weekId, `Ошибка: ${msg}`);
       console.error('AI summary error:', e);
-      alert('Ошибка сети при вызове AI');
     } finally {
       setSummaryLoading(null);
     }
