@@ -538,13 +538,25 @@ export default function GanttPage() {
   // ── Current week index ─────────────────────────────────────────────────────
   const currentWeekIdx = useMemo(() => getCurrentWeekIndex(), []);
 
+  // ── Mobile detection ─────────────────────────────────────────────────────
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)');
+    setIsMobile(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
   // ── Visible weeks ──────────────────────────────────────────────────────────
+  const effectiveCount = isMobile ? 1 : VISIBLE_COUNT;
   const visibleWeeks = useMemo(() => {
     return weeks.slice(visibleStartIdx, visibleStartIdx + VISIBLE_COUNT);
   }, [weeks, visibleStartIdx]);
+  const shownWeeks = isMobile ? weeks.slice(visibleStartIdx, visibleStartIdx + 1) : visibleWeeks;
 
   const canGoBack = visibleStartIdx > 0;
-  const canGoForward = visibleStartIdx + VISIBLE_COUNT < weeks.length;
+  const canGoForward = visibleStartIdx + effectiveCount < weeks.length;
 
   // Slide animation direction
   const [slideDir, setSlideDir] = useState<'left' | 'right' | null>(null);
@@ -976,7 +988,7 @@ export default function GanttPage() {
       )}
 
       {/* Header */}
-      <div className="border-b border-border px-8 py-6">
+      <div className="border-b border-border px-4 py-4 md:px-8 md:py-6">
         <div className="max-w-[1400px] mx-auto">
           <div className="flex items-center gap-3 mb-1">
             <p className="font-mono text-[length:var(--text-12)] uppercase tracking-[0.12em] text-muted-foreground flex-1">
@@ -993,12 +1005,12 @@ export default function GanttPage() {
         </div>
       </div>
 
-      <div className="max-w-[1400px] mx-auto px-8 py-8 space-y-6">
+      <div className="max-w-[1400px] mx-auto px-4 py-4 md:px-8 md:py-8 space-y-4 md:space-y-6">
 
         {/* Week navigation */}
         <div className="flex items-center gap-2">
           <span className="text-[length:var(--text-12)] text-muted-foreground font-mono mr-auto">
-            Недели {visibleStartIdx + 1}–{Math.min(visibleStartIdx + VISIBLE_COUNT, weeks.length)} из {weeks.length}
+            Недели {visibleStartIdx + 1}–{Math.min(visibleStartIdx + effectiveCount, weeks.length)} из {weeks.length}
           </span>
           <button
             onClick={() => navigateWeeks('left')}
@@ -1029,9 +1041,9 @@ export default function GanttPage() {
 
         {/* Gantt table */}
         <div className="border border-border rounded-xl overflow-hidden">
-          <div className="overflow-x-auto" style={{ overflow: 'hidden' }}>
+          <div style={{ overflow: 'hidden' }}>
             <div style={{
-              minWidth: COL_W + visibleWeeks.length * 240,
+              minWidth: isMobile ? '100%' : COL_W + shownWeeks.length * 240,
               transform: slideDir ? `translateX(${slideDir === 'left' ? '40px' : '-40px'})` : 'translateX(0)',
               opacity: slideDir ? 0.6 : 1,
               transition: slideDir ? 'transform 0.25s ease-out, opacity 0.25s ease-out' : 'none',
@@ -1040,21 +1052,21 @@ export default function GanttPage() {
               {/* Header */}
               <div className="flex border-b border-border bg-muted/40 sticky top-0 z-10">
                 <div
-                  className="flex-shrink-0 px-4 py-3 border-r border-border text-[length:var(--text-12)] font-mono uppercase tracking-wide text-muted-foreground bg-muted/40"
-                  style={{ width: COL_W, minWidth: COL_W }}
+                  className="flex-shrink-0 px-2 py-3 md:px-4 border-r border-border text-[length:var(--text-12)] font-mono uppercase tracking-wide text-muted-foreground bg-muted/40"
+                  style={isMobile ? { width: '30%', minWidth: 0 } : { width: COL_W, minWidth: COL_W }}
                 >
                   Раздел
                 </div>
-                {visibleWeeks.map((w, localIdx) => {
+                {shownWeeks.map((w, localIdx) => {
                   const globalIdx = visibleStartIdx + localIdx;
                   const isCurrent = globalIdx === currentWeekIdx;
                   const effColor = getEffectiveColor(globalIdx);
                   return (
                     <div
                       key={w.id}
-                      className="flex-1 px-3 py-2.5 border-r border-border last:border-r-0 relative overflow-hidden"
+                      className="flex-1 px-2 py-2 md:px-3 md:py-2.5 border-r border-border last:border-r-0 relative overflow-hidden"
                       style={{
-                        minWidth: 240,
+                        minWidth: isMobile ? 0 : 240,
                         backgroundColor: isCurrent ? cssVar('yellow', '900') : undefined,
                         borderTop: `2px solid ${cssVar(effColor, '100')}`,
                       }}
@@ -1117,8 +1129,8 @@ export default function GanttPage() {
                 >
                   {/* Left column */}
                   <div
-                    className="flex-shrink-0 flex items-start gap-2 px-3 py-3 border-r border-border bg-background"
-                    style={{ width: COL_W, minWidth: COL_W }}
+                    className="flex-shrink-0 flex items-start gap-1 px-2 py-2 md:gap-2 md:px-3 md:py-3 border-r border-border bg-background"
+                    style={isMobile ? { width: '30%', minWidth: 0 } : { width: COL_W, minWidth: COL_W }}
                   >
                     <span
                       className="cursor-grab text-muted-foreground/30 hover:text-muted-foreground transition-colors select-none flex-shrink-0 mt-0.5 text-[length:var(--text-16)] leading-none"
@@ -1139,7 +1151,7 @@ export default function GanttPage() {
                   </div>
 
                   {/* Week cells */}
-                  {visibleWeeks.map((w, localIdx) => {
+                  {shownWeeks.map((w, localIdx) => {
                     const globalIdx = visibleStartIdx + localIdx;
                     const isCurrent = globalIdx === currentWeekIdx;
                     const effColor = getEffectiveColor(globalIdx);
@@ -1147,9 +1159,9 @@ export default function GanttPage() {
                     return (
                       <div
                         key={w.id}
-                        className="flex-1 px-2 py-2 border-r border-border/40 last:border-r-0"
+                        className="flex-1 px-1.5 py-1.5 md:px-2 md:py-2 border-r border-border/40 last:border-r-0"
                         style={{
-                          minWidth: 240,
+                          minWidth: isMobile ? 0 : 240,
                           backgroundColor: isCurrent ? `color-mix(in srgb, ${cssVar('yellow', '900')}, transparent 60%)` : undefined,
                         }}
                         onDragOver={e => onCardDragOver(e, row.id, w.id, null)}
@@ -1225,7 +1237,7 @@ export default function GanttPage() {
         </div>
 
         {/* Bottom controls */}
-        <div className="flex items-center gap-4 text-[length:var(--text-12)] text-muted-foreground font-mono pb-2">
+        <div className="flex items-center gap-3 md:gap-4 text-[length:var(--text-12)] text-muted-foreground font-mono pb-2">
           {!locked && (
             <button
               onClick={addRow}
@@ -1234,7 +1246,7 @@ export default function GanttPage() {
               + строка
             </button>
           )}
-          <div className="flex items-center gap-4 flex-1">
+          <div className="hidden md:flex items-center gap-4 flex-1">
             {!locked && (
               <>
                 <span>⠿ перетащить строку</span>
@@ -1244,6 +1256,7 @@ export default function GanttPage() {
             )}
             {locked && <span className="text-muted-foreground/60">Редактирование заблокировано</span>}
           </div>
+          <div className="flex-1 md:hidden" />
           <button
             onClick={() => {
               if (locked) { setShowLockModal(true); }
