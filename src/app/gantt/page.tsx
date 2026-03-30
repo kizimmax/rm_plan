@@ -824,13 +824,30 @@ export default function GanttPage() {
     const totalTasks = sections.reduce((s, sec) => s + sec.total, 0);
     const doneTasks = sections.reduce((s, sec) => s + sec.done, 0);
 
-    // Build a concise 1-line summary: "3/8 · DS, MVP сервиса, QA"
+    // Extract short key phrases from task labels
     let summary = '';
     if (totalTasks === 0) {
       summary = 'Нет задач';
     } else {
-      const areas = sections.map(s => s.name);
-      summary = `${doneTasks}/${totalTasks} · ${areas.join(', ')}`;
+      const phrases = sections
+        .flatMap(s => s.tasks.map(t => t.label))
+        .map(label => {
+          // Take text before long delimiters, strip noise
+          const short = label
+            .split(/\n/)[0]                          // first line only
+            .split(/\s*[—–:]\s*/)[0]                 // before em-dash or colon
+            .replace(/\(.*?\)/g, '')                  // remove parentheticals
+            .replace(/\d+[–-]\d+\s*/g, '')            // remove ranges like "8–15"
+            .trim();
+          // Cap at ~30 chars, cut at last word boundary
+          if (short.length <= 30) return short;
+          return short.slice(0, 30).replace(/\s+\S*$/, '') + '…';
+        })
+        .filter(Boolean);
+
+      // Deduplicate and take top 4
+      const unique = [...new Set(phrases)].slice(0, 4);
+      summary = `${doneTasks}/${totalTasks} · ${unique.join(' + ')}`;
     }
 
     // Write summary into the week's theme field
