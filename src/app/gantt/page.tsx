@@ -661,8 +661,6 @@ export default function GanttPage() {
 
   const updateWeeks = (next: Week[]) => { setWeeks(next); persist(next, rows, title, subtitle, locked); };
   const updateRows  = (next: Row[])  => { setRows(next);  persist(weeks, next, title, subtitle, locked); };
-  const updateTitle = (v: string)    => { setTitle(v);    persist(weeks, rows, v, subtitle, locked); };
-  const updateSubtitle = (v: string) => { setSubtitle(v); persist(weeks, rows, title, v, locked); };
   const updateLocked = (v: boolean)  => { setLocked(v);   persist(weeks, rows, title, subtitle, v); };
 
   // ── Row drag ──────────────────────────────────────────────────────────────
@@ -1006,30 +1004,12 @@ export default function GanttPage() {
         </div>
       )}
 
-      {/* Header */}
-      <div className="border-b border-border px-4 py-4 md:px-8 md:py-6">
-        <div className="max-w-[1400px] mx-auto">
-          <div className="flex items-center gap-3 mb-1">
-            <p className="font-mono text-[length:var(--text-12)] uppercase tracking-[0.12em] text-muted-foreground flex-1">
-              Rocketmind · MVP 1.1
-            </p>
-            <SyncDot status={syncStatus} />
-          </div>
-          <h1 className="font-heading text-[length:var(--text-31)] font-bold leading-tight">
-            <EditableText value={title} onChange={updateTitle} />
-          </h1>
-          <p className="text-muted-foreground mt-1.5 text-[length:var(--text-14)]">
-            <EditableText value={subtitle} onChange={updateSubtitle} />
-          </p>
-        </div>
-      </div>
-
       <div className="max-w-[1400px] mx-auto px-4 py-4 md:px-8 md:py-8 space-y-4 md:space-y-6">
 
         {/* Week navigation */}
         <div className="flex items-center gap-2">
-          <span className="text-[length:var(--text-12)] text-muted-foreground font-mono mr-auto">
-            Недели {visibleStartIdx + 1}–{Math.min(visibleStartIdx + effectiveCount, weeks.length)} из {weeks.length}
+          <span className="text-[length:var(--text-12)] text-muted-foreground font-mono mr-auto uppercase tracking-[0.12em] flex items-center gap-2">
+            План работ <SyncDot status={syncStatus} />
           </span>
           <button
             onClick={() => navigateWeeks('left')}
