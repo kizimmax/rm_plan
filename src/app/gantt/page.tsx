@@ -910,53 +910,6 @@ export default function GanttPage() {
           )}
         </div>
 
-        {/* Week cards */}
-        <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${visibleWeeks.length}, 1fr)` }}>
-          {visibleWeeks.map((w, localIdx) => {
-            const globalIdx = visibleStartIdx + localIdx;
-            const isCurrent = globalIdx === currentWeekIdx;
-            const effColor = getEffectiveColor(globalIdx);
-            return (
-              <div
-                key={w.id}
-                className="border rounded-xl p-4 relative overflow-hidden transition-colors"
-                style={{
-                  borderColor: isCurrent ? cssVar('yellow', '300') : 'var(--border)',
-                  backgroundColor: isCurrent ? cssVar('yellow', '900') : undefined,
-                }}
-              >
-                <div
-                  className="absolute top-0 left-0 right-0"
-                  style={{
-                    height: isCurrent ? 3 : 1,
-                    backgroundColor: cssVar(effColor, '100'),
-                  }}
-                />
-                <div className="font-mono text-[length:var(--text-12)] uppercase tracking-[0.12em] mb-1" style={{ color: cssVar(effColor, isCurrent ? '100' : 'fg-subtle') }}>
-                  <EditableText value={w.dates} onChange={v => updateWeekDates(w.id, v)} />
-                </div>
-                <div className="font-heading font-bold text-[length:var(--text-16)] mb-1" style={{ color: isCurrent ? cssVar('yellow', 'fg') : undefined }}>
-                  <EditableText value={w.label} onChange={v => updateWeekLabel(w.id, v)} />
-                </div>
-                <p className="text-[length:var(--text-12)] leading-snug" style={{ color: cssVar(effColor, 'fg-subtle') }}>
-                  <EditableText value={w.theme} onChange={v => updateWeekTheme(w.id, v)} />
-                </p>
-                {isCurrent && (
-                  <div
-                    className="absolute top-2 right-2 px-1.5 py-0.5 rounded text-[length:9px] font-mono uppercase tracking-wider"
-                    style={{
-                      backgroundColor: cssVar('yellow', '100'),
-                      color: cssVar('yellow', 'fg'),
-                    }}
-                  >
-                    сейчас
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
         {/* Gantt table */}
         <div className="border border-border rounded-xl overflow-hidden">
           <div className="overflow-x-auto">
@@ -977,17 +930,39 @@ export default function GanttPage() {
                   return (
                     <div
                       key={w.id}
-                      className="flex-1 px-3 py-3 border-r border-border last:border-r-0 text-center"
-                      style={{ minWidth: 240, backgroundColor: isCurrent ? `color-mix(in srgb, ${cssVar('yellow', '900')}, transparent 60%)` : undefined }}
+                      className="flex-1 px-3 py-2.5 border-r border-border last:border-r-0 relative overflow-hidden"
+                      style={{
+                        minWidth: 240,
+                        backgroundColor: isCurrent ? cssVar('yellow', '900') : undefined,
+                        borderTop: `2px solid ${cssVar(effColor, '100')}`,
+                      }}
                     >
-                      <div className="flex items-center justify-center gap-1">
+                      {/* Row 1: label + dates + badge */}
+                      <div className="flex items-center gap-1.5">
                         <div className="font-mono text-[length:var(--text-12)] font-bold uppercase tracking-wide" style={{ color: cssVar(effColor, '100') }}>
                           <EditableText value={w.label} onChange={v => updateWeekLabel(w.id, v)} />
                         </div>
+                        <div className="font-mono text-[length:var(--text-12)] text-muted-foreground">
+                          <EditableText value={w.dates} onChange={v => updateWeekDates(w.id, v)} />
+                        </div>
+                        {isCurrent && (
+                          <span
+                            className="ml-auto px-1.5 py-0.5 rounded text-[length:9px] font-mono uppercase tracking-wider flex-shrink-0"
+                            style={{ backgroundColor: cssVar('yellow', '100'), color: cssVar('yellow', 'fg') }}
+                          >
+                            сейчас
+                          </span>
+                        )}
+                      </div>
+                      {/* Row 2: theme/summary + refresh */}
+                      <div className="flex items-start gap-1 mt-1">
+                        <p className="text-[length:var(--text-12)] leading-snug flex-1 min-w-0" style={{ color: cssVar(effColor, 'fg-subtle') }}>
+                          <EditableText value={w.theme} onChange={v => updateWeekTheme(w.id, v)} />
+                        </p>
                         <button
                           onClick={() => generateWeekSummary(w.id)}
                           disabled={summaryLoading === w.id}
-                          className="inline-flex items-center justify-center w-5 h-5 rounded transition-colors text-muted-foreground/40 hover:text-muted-foreground hover:bg-muted"
+                          className="flex-shrink-0 inline-flex items-center justify-center w-5 h-5 rounded transition-colors text-muted-foreground/40 hover:text-muted-foreground hover:bg-muted mt-0.5"
                           title="Сгенерировать итог недели"
                         >
                           {summaryLoading === w.id ? (
@@ -996,9 +971,6 @@ export default function GanttPage() {
                             <RefreshIcon className="w-3.5 h-3.5" />
                           )}
                         </button>
-                      </div>
-                      <div className="font-mono text-[length:var(--text-12)] text-muted-foreground mt-0.5">
-                        <EditableText value={w.dates} onChange={v => updateWeekDates(w.id, v)} />
                       </div>
                     </div>
                   );
