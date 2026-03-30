@@ -801,7 +801,7 @@ export default function GanttPage() {
     setVisibleStartIdx(Math.max(0, idx + 1 - VISIBLE_COUNT));
   };
 
-  // ── Generate week summary (AI-powered via Google Gemini) ─────────────────
+  // ── Generate week summary (AI-powered via Groq) ─────────────────────────
 
   const callAI = async (weekId: string, apiKey: string) => {
     const week = weeks.find(w => w.id === weekId);
@@ -825,37 +825,41 @@ export default function GanttPage() {
       return;
     }
 
-    const userPrompt = `Ты — помощник проджект-менеджера. Вот список задач на неделю "${week.label}" (${week.dates}):\n\n${taskLines.join('\n')}\n\nНапиши ОДНУ строку (до 80 символов) — краткий итог/фокус этой недели на русском. Не используй маркеры списка, не повторяй название недели. Только суть: что будет сделано или достигнуто. Формат: "N/M · краткий итог" где N — сделано, M — всего задач.`;
-
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
-      const res = await fetch(url, {
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: userPrompt }] }],
-          generationConfig: { maxOutputTokens: 120 },
+          model: 'llama-3.1-8b-instant',
+          max_tokens: 120,
+          messages: [
+            { role: 'system', content: 'Ты — помощник проджект-менеджера. Отвечай строго одной строкой на русском.' },
+            { role: 'user', content: `Вот список задач на неделю "${week.label}" (${week.dates}):\n\n${taskLines.join('\n')}\n\nНапиши ОДНУ строку (до 80 символов) — краткий итог/фокус этой недели. Не используй маркеры списка, не повторяй название недели. Только суть: что будет сделано или достигнуто. Формат: "N/M · краткий итог" где N — сделано, M — всего задач.` },
+          ],
         }),
       });
 
       if (!res.ok) {
         const errBody = await res.text().catch(() => '');
-        if (res.status === 400 || res.status === 403) {
-          localStorage.removeItem('gemini_api_key');
-          updateWeekTheme(weekId, `Ошибка ${res.status}: неверный ключ`);
+        if (res.status === 401) {
+          localStorage.removeItem('groq_api_key');
+          updateWeekTheme(weekId, 'Неверный ключ');
           setPendingWeekId(weekId);
           setKeyValue('');
           setShowKeyInput(true);
         } else {
           updateWeekTheme(weekId, `Ошибка API: ${res.status}`);
-          console.error('Gemini error:', errBody);
+          console.error('Groq error:', errBody);
         }
         setSummaryLoading(null);
         return;
       }
 
       const data = await res.json();
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? '';
+      const text = data.choices?.[0]?.message?.content?.trim() ?? '';
       updateWeekTheme(weekId, text || 'Пустой ответ от AI');
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -869,7 +873,7 @@ export default function GanttPage() {
   const [keyValue, setKeyValue] = useState('');
 
   const generateWeekSummary = (weekId: string) => {
-    const stored = localStorage.getItem('gemini_api_key');
+    const stored = localStorage.getItem('groq_api_key');
     if (stored) {
       callAI(weekId, stored);
     } else {
@@ -882,7 +886,7 @@ export default function GanttPage() {
   const handleKeySubmit = () => {
     const val = keyValue.trim();
     if (!val || !pendingWeekId) return;
-    localStorage.setItem('gemini_api_key', val);
+    localStorage.setItem('groq_api_key', val);
     setShowKeyInput(false);
     const wid = pendingWeekId;
     setPendingWeekId(null);
@@ -900,12 +904,12 @@ export default function GanttPage() {
       {showKeyInput && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => { setShowKeyInput(false); setPendingWeekId(null); }}>
           <div className="bg-background border border-border rounded-lg p-6 shadow-xl max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
-            <p className="font-heading text-[length:var(--text-16)] font-bold mb-1">Google Gemini API Key</p>
-            <p className="text-muted-foreground text-[length:var(--text-12)] mb-4">Бесплатно на <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" style={{textDecoration:'underline'}}>aistudio.google.com/apikey</a></p>
+            <p className="font-heading text-[length:var(--text-16)] font-bold mb-1">Groq API Key</p>
+            <p className="text-muted-foreground text-[length:var(--text-12)] mb-4">Бесплатно на <a href="https://console.groq.com/keys" target="_blank" rel="noopener" style={{textDecoration:'underline'}}>console.groq.com/keys</a></p>
             <input
               autoFocus
               type="password"
-              placeholder="AIza..."
+              placeholder="gsk_..."
               value={keyValue}
               onChange={e => setKeyValue(e.target.value)}
               className="w-full px-3 py-2 rounded border border-border bg-background text-foreground font-mono text-[length:var(--text-14)] mb-3 outline-none focus:border-muted-foreground"
