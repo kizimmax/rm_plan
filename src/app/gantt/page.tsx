@@ -546,6 +546,25 @@ export default function GanttPage() {
   const canGoBack = visibleStartIdx > 0;
   const canGoForward = visibleStartIdx + VISIBLE_COUNT < weeks.length;
 
+  // Slide animation direction
+  const [slideDir, setSlideDir] = useState<'left' | 'right' | null>(null);
+  const [animating, setAnimating] = useState(false);
+  const slideTimerRef = useRef<number | null>(null);
+
+  const navigateWeeks = useCallback((dir: 'left' | 'right') => {
+    if (animating) return;
+    if (dir === 'left' && !canGoBack) return;
+    if (dir === 'right' && !canGoForward) return;
+    setSlideDir(dir);
+    setAnimating(true);
+    if (slideTimerRef.current !== null) clearTimeout(slideTimerRef.current);
+    slideTimerRef.current = window.setTimeout(() => {
+      setVisibleStartIdx(i => dir === 'left' ? Math.max(0, i - 1) : Math.min(weeks.length - VISIBLE_COUNT, i + 1));
+      setSlideDir(null);
+      setAnimating(false);
+    }, 250);
+  }, [animating, canGoBack, canGoForward, weeks.length]);
+
   // Effective color: current week = yellow, others = neutral
   const getEffectiveColor = useCallback((globalIdx: number): ColorToken => {
     return globalIdx === currentWeekIdx ? 'yellow' : 'neutral';
@@ -982,16 +1001,16 @@ export default function GanttPage() {
             Недели {visibleStartIdx + 1}–{Math.min(visibleStartIdx + VISIBLE_COUNT, weeks.length)} из {weeks.length}
           </span>
           <button
-            onClick={() => setVisibleStartIdx(i => Math.max(0, i - 1))}
-            disabled={!canGoBack}
+            onClick={() => navigateWeeks('left')}
+            disabled={!canGoBack || animating}
             className="w-8 h-8 flex items-center justify-center rounded-lg border border-border transition-colors hover:bg-muted disabled:opacity-25 disabled:pointer-events-none"
             title="Предыдущая неделя"
           >
             <ChevronLeftIcon className="w-4 h-4" />
           </button>
           <button
-            onClick={() => setVisibleStartIdx(i => Math.min(weeks.length - VISIBLE_COUNT, i + 1))}
-            disabled={!canGoForward}
+            onClick={() => navigateWeeks('right')}
+            disabled={!canGoForward || animating}
             className="w-8 h-8 flex items-center justify-center rounded-lg border border-border transition-colors hover:bg-muted disabled:opacity-25 disabled:pointer-events-none"
             title="Следующая неделя"
           >
@@ -1010,8 +1029,13 @@ export default function GanttPage() {
 
         {/* Gantt table */}
         <div className="border border-border rounded-xl overflow-hidden">
-          <div className="overflow-x-auto">
-            <div style={{ minWidth: COL_W + visibleWeeks.length * 240 }}>
+          <div className="overflow-x-auto" style={{ overflow: 'hidden' }}>
+            <div style={{
+              minWidth: COL_W + visibleWeeks.length * 240,
+              transform: slideDir ? `translateX(${slideDir === 'left' ? '40px' : '-40px'})` : 'translateX(0)',
+              opacity: slideDir ? 0.6 : 1,
+              transition: slideDir ? 'transform 0.25s ease-out, opacity 0.25s ease-out' : 'none',
+            }}>
 
               {/* Header */}
               <div className="flex border-b border-border bg-muted/40 sticky top-0 z-10">
