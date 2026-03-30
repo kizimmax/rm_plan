@@ -309,6 +309,7 @@ function CardItem({
         <div className="flex-1 grid grid-cols-5 gap-1">
           {DAYS.map(day => {
             const active = (c.days ?? []).includes(day);
+            const isNeutral = weekColor === 'neutral';
             return (
               <button
                 key={day}
@@ -318,10 +319,16 @@ function CardItem({
                   fontSize: 9,
                   height: 16,
                   borderRadius: 3,
-                  backgroundColor: active ? cssVar(weekColor, '100') : cssVar(weekColor, '900'),
-                  color: active ? cssVar(weekColor, 'fg') : cssVar(weekColor, 'fg-subtle'),
+                  backgroundColor: active
+                    ? (isNeutral && !c.done ? 'var(--foreground)' : cssVar(weekColor, '100'))
+                    : cssVar(weekColor, '900'),
+                  color: active
+                    ? (isNeutral && !c.done ? 'var(--background)' : cssVar(weekColor, 'fg'))
+                    : cssVar(weekColor, 'fg-subtle'),
                   opacity: active ? 1 : 0.6,
-                  border: `1px solid ${active ? cssVar(weekColor, '100') : cssVar(weekColor, '300')}`,
+                  border: `1px solid ${active
+                    ? (isNeutral && !c.done ? 'var(--foreground)' : cssVar(weekColor, '100'))
+                    : cssVar(weekColor, '300')}`,
                 }}
                 title={day}
               >
@@ -346,7 +353,7 @@ function CardItem({
           ref={taRef}
           defaultValue={c.label}
           className="w-full bg-transparent outline-none resize-none text-[length:var(--text-12)] leading-snug"
-          style={{ color: c.done ? cssVar(weekColor, 'fg-subtle') : cssVar(weekColor, '100'), minHeight: 32 }}
+          style={{ color: c.done ? cssVar(weekColor, 'fg-subtle') : (weekColor === 'neutral' ? 'var(--foreground)' : cssVar(weekColor, '100')), minHeight: 32 }}
           rows={Math.max(lines.length, 1)}
           onInput={e => autoResize(e.currentTarget)}
           onBlur={e => {
@@ -364,12 +371,15 @@ function CardItem({
           onDoubleClick={locked ? undefined : startEdit}
           title={locked ? undefined : 'Двойной клик — редактировать'}
         >
-          {(lines.length > 0 ? lines : [c.label]).map((line, i) => (
+          {(lines.length > 0 ? lines : [c.label]).map((line, i) => {
+            const openColor = weekColor === 'neutral' ? 'var(--foreground)' : cssVar(weekColor, '100');
+            return (
             <li key={i} className="flex items-start gap-1.5 text-[length:var(--text-12)] leading-snug">
-              <span className="flex-shrink-0 mt-[3px] w-1 h-1 rounded-full" style={{ backgroundColor: cssVar(weekColor, '100'), opacity: c.done ? 0.4 : 0.7 }} />
-              <span style={{ color: c.done ? cssVar(weekColor, 'fg-subtle') : cssVar(weekColor, '100') }}>{line}</span>
+              <span className="flex-shrink-0 mt-[3px] w-1 h-1 rounded-full" style={{ backgroundColor: openColor, opacity: c.done ? 0.4 : 0.7 }} />
+              <span style={{ color: c.done ? cssVar(weekColor, 'fg-subtle') : openColor }}>{line}</span>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </div>
