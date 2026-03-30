@@ -199,13 +199,15 @@ function EditableText({
   }, [startEditing, start]);
 
   if (editing) {
+    const lineCount = Math.max((value.match(/\n/g)?.length ?? 0) + 1, Math.ceil(value.length / 30), 2);
     return (
       <textarea
         ref={ref}
         defaultValue={value}
         className={`bg-transparent resize-none outline-none w-full ${className ?? ''}`}
         style={{ ...style, minHeight: 32 }}
-        rows={2}
+        rows={lineCount}
+        onInput={e => { const t = e.currentTarget; t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px'; }}
         onBlur={e => { onChange(e.target.value); setEditing(false); }}
         onKeyDown={e => {
           if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); (e.target as HTMLTextAreaElement).blur(); }
