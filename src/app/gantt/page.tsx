@@ -506,6 +506,10 @@ export default function GanttPage() {
 
   // Summary loading
   const [summaryLoading, setSummaryLoading] = useState<string | null>(null);
+  // API key input dialog
+  const [showKeyInput, setShowKeyInput] = useState(false);
+  const [pendingWeekId, setPendingWeekId] = useState<string | null>(null);
+  const keyInputRef = useRef<HTMLInputElement>(null);
 
   // Track whether we've received the first snapshot from Firebase
   const initialized = useRef(false);
@@ -800,18 +804,7 @@ export default function GanttPage() {
 
   // ── Generate week summary (AI-powered via OpenAI) ────────────────────────
 
-  const getOpenAIKey = (): string | null => {
-    const stored = localStorage.getItem('openai_api_key');
-    if (stored) return stored;
-    const key = prompt('Введите OpenAI API ключ для AI-саммери:');
-    if (key?.trim()) {
-      localStorage.setItem('openai_api_key', key.trim());
-      return key.trim();
-    }
-    return null;
-  };
-
-  const generateWeekSummary = async (weekId: string) => {
+  const callOpenAI = async (weekId: string, apiKey: string) => {
     const week = weeks.find(w => w.id === weekId);
     if (!week) return;
 
@@ -828,12 +821,6 @@ export default function GanttPage() {
 
     if (taskLines.length === 0) {
       updateWeekTheme(weekId, 'Нет задач');
-      setSummaryLoading(null);
-      return;
-    }
-
-    const apiKey = getOpenAIKey();
-    if (!apiKey) {
       setSummaryLoading(null);
       return;
     }
@@ -858,9 +845,8 @@ export default function GanttPage() {
       if (!res.ok) {
         if (res.status === 401 || res.status === 429) {
           localStorage.removeItem('openai_api_key');
-          alert(res.status === 401 ? 'Неверный API ключ. Попробуйте ещё раз.' : 'Rate limit (429). Ключ сброшен — введите другой.');
+          alert(res.status === 401 ? 'Неверный API ключ.' : 'Rate limit (429). Ключ сброшен.');
         } else {
-          console.error('OpenAI API error:', res.status);
           alert('Ошибка API: ' + res.status);
         }
         setSummaryLoading(null);
@@ -869,9 +855,7 @@ export default function GanttPage() {
 
       const data = await res.json();
       const text = data.choices?.[0]?.message?.content?.trim() ?? '';
-      if (text) {
-        updateWeekTheme(weekId, text);
-      }
+      if (text) updateWeekTheme(weekId, text);
     } catch (e) {
       console.error('AI summary error:', e);
       alert('Ошибка сети при вызове AI');
@@ -880,12 +864,53 @@ export default function GanttPage() {
     }
   };
 
+  const generateWeekSummary = (weekId: string) => {
+    const stored = localStorage.getItem('openai_api_key');
+    if (stored) {
+      callOpenAI(weekId, stored);
+    } else {
+      setPendingWeekId(weekId);
+      setShowKeyInput(true);
+      setTimeout(() => keyInputRef.current?.focus(), 50);
+    }
+  };
+
+  const handleKeySubmit = () => {
+    const val = keyInputRef.current?.value?.trim();
+    if (!val || !pendingWeekId) return;
+    localStorage.setItem('openai_api_key', val);
+    setShowKeyInput(false);
+    callOpenAI(pendingWeekId, val);
+    setPendingWeekId(null);
+  };
+
   // ──────────────────────────────────────────────────────────────────────────
 
   const COL_W = 154;
 
   return (
     <div className="min-h-screen bg-background text-foreground font-body">
+
+      {/* API Key input overlay */}
+      {showKeyInput && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => { setShowKeyInput(false); setPendingWeekId(null); }}>
+          <div className="bg-background border border-border rounded-lg p-6 shadow-xl max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
+            <p className="font-heading text-[length:var(--text-16)] font-bold mb-1">OpenAI API Key</p>
+            <p className="text-muted-foreground text-[length:var(--text-12)] mb-4">Ключ сохранится в браузере</p>
+            <input
+              ref={keyInputRef}
+              type="password"
+              placeholder="sk-..."
+              className="w-full px-3 py-2 rounded border border-border bg-background text-foreground font-mono text-[length:var(--text-14)] mb-3 outline-none focus:border-muted-foreground"
+              onKeyDown={e => { if (e.key === 'Enter') handleKeySubmit(); }}
+            />
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => { setShowKeyInput(false); setPendingWeekId(null); }} className="px-3 py-1.5 rounded text-[length:var(--text-12)] text-muted-foreground hover:bg-muted">Отмена</button>
+              <button onClick={handleKeySubmit} className="px-3 py-1.5 rounded text-[length:var(--text-12)] bg-foreground text-background font-medium hover:opacity-90">Сохранить</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Header */}
       <div className="border-b border-border px-8 py-6">
