@@ -823,36 +823,15 @@ export default function GanttPage() {
 
     const totalTasks = sections.reduce((s, sec) => s + sec.total, 0);
     const doneTasks = sections.reduce((s, sec) => s + sec.done, 0);
-    const pct = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
 
-    // Build a short 2-line summary of key results
-    let line1 = '';
-    let line2 = '';
-
+    // Build a concise 1-line summary: "3/8 · DS, MVP сервиса, QA"
+    let summary = '';
     if (totalTasks === 0) {
-      line1 = 'Нет задач на неделю';
+      summary = 'Нет задач';
     } else {
-      // Line 1: progress + key deliverables (extract first meaningful word from each task)
-      const keyResults = sections
-        .flatMap(s => s.tasks.map(t => t.label))
-        .map(l => l.replace(/^(DS |MVP |QA |Auth |End-to-end )?/, '').split(/[,:+·—–]/)[0].trim())
-        .filter(Boolean)
-        .slice(0, 4);
-      line1 = `${doneTasks}/${totalTasks} — ${keyResults.join(', ')}`;
-
-      // Line 2: status assessment
-      const openTasks = sections
-        .flatMap(s => s.tasks.filter(t => !t.done))
-        .map(t => t.label.split(/[,\n]/)[0].trim())
-        .slice(0, 2);
-      if (pct === 100) {
-        line2 = 'Все задачи закрыты';
-      } else if (openTasks.length > 0) {
-        line2 = `В работе: ${openTasks.join(', ')}`;
-      }
+      const areas = sections.map(s => s.name);
+      summary = `${doneTasks}/${totalTasks} · ${areas.join(', ')}`;
     }
-
-    const summary = line2 ? `${line1}\n${line2}` : line1;
 
     // Write summary into the week's theme field
     setTimeout(() => {
