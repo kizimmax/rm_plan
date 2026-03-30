@@ -341,7 +341,7 @@ function CardItem({
           ref={taRef}
           defaultValue={c.label}
           className="w-full bg-transparent outline-none resize-none text-[length:var(--text-12)] leading-snug"
-          style={{ color: c.done ? cssVar(weekColor, 'fg-subtle') : cssVar(weekColor, 'fg'), minHeight: 32 }}
+          style={{ color: c.done ? cssVar(weekColor, 'fg-subtle') : cssVar(weekColor, '100'), minHeight: 32 }}
           rows={Math.max(lines.length, 1)}
           onInput={e => autoResize(e.currentTarget)}
           onBlur={e => {
@@ -362,7 +362,7 @@ function CardItem({
           {(lines.length > 0 ? lines : [c.label]).map((line, i) => (
             <li key={i} className="flex items-start gap-1.5 text-[length:var(--text-12)] leading-snug">
               <span className="flex-shrink-0 mt-[3px] w-1 h-1 rounded-full" style={{ backgroundColor: cssVar(weekColor, '100'), opacity: c.done ? 0.4 : 0.7 }} />
-              <span style={{ color: c.done ? cssVar(weekColor, 'fg-subtle') : cssVar(weekColor, 'fg') }}>{line}</span>
+              <span style={{ color: c.done ? cssVar(weekColor, 'fg-subtle') : cssVar(weekColor, '100') }}>{line}</span>
             </li>
           ))}
         </ul>
@@ -942,7 +942,7 @@ export default function GanttPage() {
                         <div className="font-mono text-[length:var(--text-12)] font-bold uppercase tracking-wide" style={{ color: cssVar(effColor, '100') }}>
                           <EditableText value={w.label} onChange={v => updateWeekLabel(w.id, v)} />
                         </div>
-                        <div className="font-mono text-[length:var(--text-12)] text-muted-foreground">
+                        <div className="font-mono text-[length:var(--text-12)]" style={{ color: isCurrent ? cssVar('yellow', '500') : 'var(--muted-foreground)' }}>
                           <EditableText value={w.dates} onChange={v => updateWeekDates(w.id, v)} />
                         </div>
                         {isCurrent && (
