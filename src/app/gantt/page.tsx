@@ -497,8 +497,12 @@ export default function GanttPage() {
   const [showLockModal, setShowLockModal] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'synced' | 'saving' | 'error' | 'loading'>('loading');
 
-  // Week navigation
-  const [visibleStartIdx, setVisibleStartIdx] = useState(0);
+  // Week navigation — start near current week to avoid flash
+  const [visibleStartIdx, setVisibleStartIdx] = useState(() => {
+    const cwIdx = getCurrentWeekIndex();
+    const maxStart = Math.max(0, INITIAL_WEEKS.length - VISIBLE_COUNT);
+    return cwIdx > 0 ? Math.min(Math.max(0, cwIdx - 1), maxStart) : 0;
+  });
 
   // Summary loading
   const [summaryLoading, setSummaryLoading] = useState<string | null>(null);
@@ -526,16 +530,8 @@ export default function GanttPage() {
     return globalIdx === currentWeekIdx ? 'yellow' : 'neutral';
   }, [currentWeekIdx]);
 
-  // ── Auto-scroll to current week on first data load ─────────────────────────
-  useEffect(() => {
-    if (!didInitialScroll.current && weeks.length > 0) {
-      didInitialScroll.current = true;
-      if (currentWeekIdx >= 0 && currentWeekIdx < weeks.length) {
-        const target = Math.max(0, Math.min(currentWeekIdx - 1, weeks.length - VISIBLE_COUNT));
-        setVisibleStartIdx(target);
-      }
-    }
-  }, [weeks.length, currentWeekIdx]);
+  // ── Auto-scroll to current week on first Firebase load ──────────────────────
+  // (handled inside onValue callback to avoid racing with initial state)
 
   // ── Subscribe to Firebase Realtime DB ─────────────────────────────────────
   useEffect(() => {
@@ -551,6 +547,20 @@ export default function GanttPage() {
           if (data.title) setTitle(data.title);
           if (data.subtitle) setSubtitle(data.subtitle);
           if (data.locked !== undefined) setLocked(data.locked);
+          // Auto-scroll to current week on first load
+          if (!didInitialScroll.current && data.weeks?.length > 0) {
+            didInitialScroll.current = true;
+            const wLen = data.weeks.length;
+            if (currentWeekIdx >= 0 && currentWeekIdx < wLen) {
+              // Position so current week is visible with previous week for context
+              const maxStart = Math.max(0, wLen - VISIBLE_COUNT);
+              const ideal = Math.max(0, currentWeekIdx - 1);
+              setVisibleStartIdx(Math.min(ideal, maxStart));
+            } else if (wLen > VISIBLE_COUNT) {
+              // If current week is past the end, show last N weeks
+              setVisibleStartIdx(wLen - VISIBLE_COUNT);
+            }
+          }
         }
         initialized.current = true;
         setSyncStatus('synced');
