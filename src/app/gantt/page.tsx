@@ -856,9 +856,9 @@ export default function GanttPage() {
       });
 
       if (!res.ok) {
-        if (res.status === 401) {
+        if (res.status === 401 || res.status === 429) {
           localStorage.removeItem('openai_api_key');
-          alert('Неверный API ключ. Попробуйте ещё раз.');
+          alert(res.status === 401 ? 'Неверный API ключ. Попробуйте ещё раз.' : 'Rate limit (429). Ключ сброшен — введите другой.');
         } else {
           console.error('OpenAI API error:', res.status);
           alert('Ошибка API: ' + res.status);
