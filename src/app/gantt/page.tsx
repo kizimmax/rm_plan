@@ -1007,13 +1007,36 @@ export default function GanttPage() {
         </div>
       )}
 
-      <div className="max-w-[1400px] mx-auto px-4 py-4 md:px-8 md:py-8 space-y-4 md:space-y-6">
+      {/* Header bar */}
+      <div className="border-b border-border px-4 py-3 md:px-8">
+        <div className="max-w-[1400px] mx-auto flex items-center gap-3">
+          <span className="font-mono text-[length:var(--text-12)] uppercase tracking-[0.12em] text-muted-foreground">Rocketmind</span>
+          <span className="text-muted-foreground/30">·</span>
+          <span className="font-mono text-[length:var(--text-12)] uppercase tracking-[0.12em] text-muted-foreground">Сайт и Сервис</span>
+          <span className="text-muted-foreground/30">·</span>
+          <SyncDot status={syncStatus} />
+        </div>
+      </div>
+
+      <div className="max-w-[1400px] mx-auto px-4 py-4 md:px-8 md:py-6 space-y-4 md:space-y-6">
 
         {/* Week navigation */}
         <div className="flex items-center gap-2">
-          <span className="text-[length:var(--text-12)] text-muted-foreground font-mono mr-auto uppercase tracking-[0.12em] flex items-center gap-2">
-            План работ <SyncDot status={syncStatus} />
+          <span className="font-heading text-[length:var(--text-16)] md:text-[length:var(--text-20)] font-bold uppercase tracking-wide mr-auto">
+            План работ
           </span>
+          <button
+            onClick={() => {
+              const html = document.documentElement;
+              const isDark = html.classList.contains('dark');
+              html.classList.toggle('dark', !isDark);
+              html.classList.toggle('light', isDark);
+            }}
+            className="w-8 h-8 flex items-center justify-center rounded-lg border border-border transition-colors hover:bg-muted text-[length:var(--text-14)]"
+            title="Сменить тему"
+          >
+            ◐
+          </button>
           <button
             onClick={() => navigateWeeks('left')}
             disabled={!canGoBack || animating}
